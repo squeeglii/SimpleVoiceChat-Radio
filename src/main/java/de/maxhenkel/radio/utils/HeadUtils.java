@@ -16,11 +16,15 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.PlayerHeadItem;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 public class HeadUtils {
+
+    public static final String NBT_SOUND_RANGE = "sound_radius";
 
     public static ItemStack createHead(String itemName, List<Component> loreComponents, GameProfile gameProfile) {
         ItemStack stack = new ItemStack(Items.PLAYER_HEAD);
@@ -32,6 +36,7 @@ public class HeadUtils {
         for (int i = 0; i < loreComponents.size(); i++) {
             lore.add(i, StringTag.valueOf(Component.Serializer.toJson(loreComponents.get(i))));
         }
+
         CompoundTag display = new CompoundTag();
         display.putString(ItemStack.TAG_DISPLAY_NAME, Component.Serializer.toJson(nameComponent));
         display.put(ItemStack.TAG_LORE, lore);
@@ -39,6 +44,7 @@ public class HeadUtils {
         tag.putInt("HideFlags", ItemStack.TooltipPart.ADDITIONAL.getMask());
 
         tag.put("SkullOwner", NbtUtils.writeGameProfile(new CompoundTag(), gameProfile));
+
         return stack;
     }
 

@@ -81,7 +81,7 @@ public class RadioStream implements Supplier<short[]> {
         de.maxhenkel.voicechat.api.ServerLevel level = api.fromServerLevel(serverLevel);
         Position pos = api.createPosition(position.getX() + 0.5D, position.getY() + 0.5D, position.getZ() + 0.5D);
         channel = api.createLocationalAudioChannel(UUID.randomUUID(), level, pos);
-        channel.setDistance(Radio.SERVER_CONFIG.radioRange.get().floatValue());
+        channel.setDistance(this.getOutputChannelRange());
         channel.setCategory(RadioVoicechatPlugin.RADIOS_CATEGORY);
         audioPlayer = api.createAudioPlayer(channel, api.createEncoder(OpusEncoderMode.AUDIO), this);
 
@@ -202,5 +202,13 @@ public class RadioStream implements Supplier<short[]> {
 
     public void close() {
         stop();
+    }
+
+
+    private float getOutputChannelRange() {
+        float range = this.radioData.getRange();
+        return range > 0
+                ? range
+                : Radio.SERVER_CONFIG.radioRange.get().floatValue();
     }
 }

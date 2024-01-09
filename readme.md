@@ -19,7 +19,8 @@ The mp3 stream must be playable by [JLayer](https://web.archive.org/web/20210108
 
 ## Commands
 
-- `/radio create "<stream-url" "<station-name>"` - Gives you a radio playing the provided mp3 stream
+- `/radio create "<stream-url" "<station-name>" [sound_radius]` - Gives you a radio playing the provided mp3 stream. If the
+radius isn't provided, the server default (48, in the config) is used.
 
 ## How to get Radio Stream URLs
 

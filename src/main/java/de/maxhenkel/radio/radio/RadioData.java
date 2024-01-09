@@ -22,21 +22,25 @@ public class RadioData {
     public static final String STREAM_URL_TAG = "stream_url";
     public static final String STATION_NAME_TAG = "station_name";
     public static final String ON_TAG = "on";
+    public static final String RANGE_TAG = "on";
 
     private final UUID id;
     private String url;
     private String stationName;
     private boolean on;
+    private float range;
 
-    public RadioData(UUID id, String url, String stationName, boolean on) {
+    public RadioData(UUID id, String url, String stationName, boolean on, float range) {
         this.id = id;
         this.url = url;
         this.stationName = stationName;
         this.on = on;
+        this.range = range;
     }
 
     public RadioData(UUID id) {
         this.id = id;
+        this.range = -1.0f;
     }
 
     public UUID getId() {
@@ -55,6 +59,10 @@ public class RadioData {
         return on;
     }
 
+    public float getRange() {
+        return this.range;
+    }
+
     public void setUrl(String url) {
         this.url = url;
     }
@@ -65,6 +73,10 @@ public class RadioData {
 
     public void setOn(boolean on) {
         this.on = on;
+    }
+
+    public void setRange(float range) {
+        this.range = range;
     }
 
     @Nullable
@@ -88,6 +100,7 @@ public class RadioData {
         radioData.url = getValue(gameProfile, STREAM_URL_TAG);
         radioData.stationName = getValue(gameProfile, STATION_NAME_TAG);
         radioData.on = Boolean.parseBoolean(getValue(gameProfile, ON_TAG));
+        radioData.range = getFloatValueOrElse(gameProfile, RANGE_TAG, -1.0f);
 
         return radioData;
     }
@@ -102,16 +115,35 @@ public class RadioData {
         if (id.equals(Util.NIL_UUID)) {
             removeValue(gameProfile, ID_TAG);
         } else {
-            putValue(gameProfile, ID_TAG, id.toString());
+            putValue(gameProfile, ID_TAG, this.id.toString());
         }
-        putValue(gameProfile, STREAM_URL_TAG, url);
-        putValue(gameProfile, STATION_NAME_TAG, stationName);
-        putValue(gameProfile, ON_TAG, String.valueOf(on));
+
+        putValue(gameProfile, STREAM_URL_TAG, this.url);
+        putValue(gameProfile, STATION_NAME_TAG, this.stationName);
+        putValue(gameProfile, ON_TAG, String.valueOf(this.on));
+        putValue(gameProfile, RANGE_TAG, String.valueOf(this.range));
     }
 
     @Nullable
     private static String getValue(GameProfile gameProfile, String key) {
-        return gameProfile.getProperties().get(key).stream().map(Property::getValue).findFirst().orElse(null);
+        return gameProfile.getProperties().get(key)
+                .stream()
+                .map(Property::getValue)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static float getFloatValueOrElse(GameProfile gameProfile, String key, float orElse) {
+        String value = getValue(gameProfile, key);
+
+        if(value == null) return orElse;
+
+        try {
+            return Float.parseFloat(value);
+        } catch (NumberFormatException err) {
+            Radio.LOGGER.warn("Malformed radio data: %s".formatted(err.getMessage()));
+            return orElse;
+        }
     }
 
     private static void putValue(GameProfile gameProfile, String key, String value) {
@@ -127,11 +159,19 @@ public class RadioData {
     }
 
     private static ItemStack createRadio(RadioData radioData) {
-        return HeadUtils.createHead(RADIO_NAME, Collections.singletonList(Component.literal(radioData.stationName).withStyle(style -> style.withItalic(false)).withStyle(ChatFormatting.GRAY)), radioData.toGameProfile());
+        return HeadUtils.createHead(
+                RADIO_NAME,
+                Collections.singletonList(
+                        Component.literal(radioData.stationName)
+                                 .withStyle(style -> style.withItalic(false))
+                                 .withStyle(ChatFormatting.GRAY)
+                ),
+                radioData.toGameProfile()
+        );
     }
 
     public ItemStack toItemWithNoId() {
-        RadioData radioData = new RadioData(Util.NIL_UUID, url, stationName, false);
+        RadioData radioData = new RadioData(Util.NIL_UUID, this.url, this.stationName, false, this.range);
         return createRadio(radioData);
     }
 
