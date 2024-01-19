@@ -22,7 +22,7 @@ public class RadioData {
     public static final String STREAM_URL_TAG = "stream_url";
     public static final String STATION_NAME_TAG = "station_name";
     public static final String ON_TAG = "on";
-    public static final String RANGE_TAG = "on";
+    public static final String RANGE_TAG = "range";
 
     private final UUID id;
     private String url;
