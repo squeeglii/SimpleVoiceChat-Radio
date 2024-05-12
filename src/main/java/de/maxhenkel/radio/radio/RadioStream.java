@@ -19,7 +19,9 @@ import net.minecraft.world.phys.Vec3;
 import javax.annotation.Nullable;
 import java.io.BufferedInputStream;
 import java.io.IOException;
-import java.net.URL;
+import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -56,39 +58,54 @@ public class RadioStream implements Supplier<short[]> {
     public void start() {
         new Thread(() -> {
             try {
-                startInternal();
-            } catch (IOException e) {
+                this.startInternal();
+            } catch (IOException | URISyntaxException e) {
                 Radio.LOGGER.error("Failed to start radio stream", e);
             }
         }, "RadioStreamStarter-%s".formatted(id)).start();
 
     }
 
-    private void startInternal() throws IOException {
-        if (radioData.getUrl() == null) {
+    private void startInternal() throws IOException, URISyntaxException {
+        if (this.radioData.getUrl() == null) {
             Radio.LOGGER.warn("Radio URL is null");
             return;
         }
+
         VoicechatServerApi api = RadioVoicechatPlugin.voicechatServerApi;
         if (api == null) {
             Radio.LOGGER.debug("Voice chat API is not yet loaded");
             RadioVoicechatPlugin.runWhenReady(this::start);
             return;
         }
-        if (channel != null) {
+
+        if (this.channel != null) {
             stop();
         }
-        de.maxhenkel.voicechat.api.ServerLevel level = api.fromServerLevel(serverLevel);
-        Position pos = api.createPosition(position.getX() + 0.5D, position.getY() + 0.5D, position.getZ() + 0.5D);
-        channel = api.createLocationalAudioChannel(UUID.randomUUID(), level, pos);
-        channel.setDistance(this.getOutputChannelRange());
-        channel.setCategory(RadioVoicechatPlugin.RADIOS_CATEGORY);
-        audioPlayer = api.createAudioPlayer(channel, api.createEncoder(OpusEncoderMode.AUDIO), this);
 
-        bitstream = new Bitstream(new BufferedInputStream(new URL(radioData.getUrl()).openStream()));
-        decoder = new Decoder();
+        de.maxhenkel.voicechat.api.ServerLevel level = api.fromServerLevel(this.serverLevel);
+        Position pos = api.createPosition(this.position.getX() + 0.5D, this.position.getY() + 0.5D, this.position.getZ() + 0.5D);
+        this.channel = api.createLocationalAudioChannel(UUID.randomUUID(), level, pos);
 
-        audioPlayer.startPlaying();
+        if(this.channel == null) {
+            Radio.LOGGER.error("Failed to create locational audio channel for .");
+            return;
+        }
+
+        this.channel.setDistance(this.getOutputChannelRange());
+        this.channel.setCategory(RadioVoicechatPlugin.RADIOS_CATEGORY);
+        this.audioPlayer = api.createAudioPlayer(this.channel, api.createEncoder(OpusEncoderMode.AUDIO), this);
+
+        InputStream input = new URI(radioData.getUrl()).toURL().openStream();
+        this.bitstream = new Bitstream(new BufferedInputStream(input));
+        this.decoder = new Decoder();
+
+        if(audioPlayer == null) {
+            Radio.LOGGER.error("Unable to start radio stream player -- audio player is null.");
+            return;
+        }
+
+        this.audioPlayer.startPlaying();
     }
 
     public void stop() {

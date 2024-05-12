@@ -28,6 +28,22 @@ repositories {
     }
 }
 
+loom {
+    runs {
+        client {
+            client()
+            runDir = "run/client"
+            ideConfigGenerated = true
+        }
+
+        server {
+            server()
+            runDir = "run/server"
+            ideConfigGenerated = true
+        }
+    }
+}
+
 runClient.doFirst {
     args = ['--username', "henkelmax${new Random().nextInt(1000)}"]
 }
