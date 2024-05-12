@@ -9,6 +9,8 @@ plugins {
 sourceCompatibility = JavaVersion.VERSION_17
 targetCompatibility = JavaVersion.VERSION_17
 
+String mod_version = "%s+%s".formatted(mod_base_version, mod_version_meta);
+
 archivesBaseName = archives_base_name
 version = mod_version
 group = maven_group
@@ -60,13 +62,13 @@ dependencies {
 }
 
 processResources {
-    filesMatching('fabric.mod.json') {
-        expand 'version': version,
-                'minecraft_dependency': minecraft_dependency,
-                'minecraft_version': minecraft_version,
-                'loader_version': loader_version,
-                'fabric_version': fabric_version,
-                'voicechat_api_version': voicechat_api_version
+    filteringCharset "UTF-8"
+
+    HashMap modifiedSrc = new HashMap<>(project.properties)
+    modifiedSrc.put("mod_version", mod_version)
+
+    filesMatching("fabric.mod.json") {
+        expand modifiedSrc
     }
 }
 
@@ -96,7 +98,7 @@ curseforge {
         addGameVersion 'Fabric'
         addGameVersion 'Java 17'
         mainArtifact(file("${buildDir}/libs/${archivesBaseName}-${version}.jar")) {
-            displayName = "[FABRIC][${minecraft_version}] ${mod_name} ${mod_version}"
+            displayName = "[FABRIC][${minecraft_version}] ${mod_name} ${mod_base_version}"
             relations {
                 requiredDependency 'simple-voice-chat'
             }
@@ -120,13 +122,13 @@ tasks.modrinthSyncBody.configure({
 modrinth {
     token = file("${rootDir}/modrinth_token.txt").exists() ? file("${rootDir}/modrinth_token.txt").text : ''
     projectId = modrinth_id
-    versionNumber = "fabric-${mod_version}"
-    versionName = "[FABRIC][${minecraft_version}] ${mod_name} ${mod_version}"
+    versionNumber = "${mod_version}"
+    versionName = "[FABRIC][${minecraft_version}] ${mod_name} ${mod_base_version}"
     uploadFile = remapJar
     versionType = release_type.toUpperCase()
     changelog = file('changelog.md').text
     gameVersions = [minecraft_version]
-    loaders = ['fabric']
+    loaders = ['fabric', 'quilt']
     syncBodyFrom = file('readme.md').text
     dependencies {
         required.project '9eGKb6K1' // Simple Voice Chat
