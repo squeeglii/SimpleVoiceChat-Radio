@@ -55,7 +55,8 @@ public class BlockBehaviourMixin {
 
         level.playSound(null, blockPos, SoundEvents.LEVER_CLICK, SoundSource.BLOCKS, 1F, 1F);
 
-        cir.setReturnValue(InteractionResult.SUCCESS);
+        cir.setReturnValue(InteractionResult.CONSUME);
+        cir.cancel();
     }
 
 }
