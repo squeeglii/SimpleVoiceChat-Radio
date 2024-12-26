@@ -1,5 +1,7 @@
 package de.maxhenkel.radio.radio;
 
+import com.tianscar.media.sound.AACAudioInputStream;
+import com.tianscar.media.sound.DecodedAACAudioInputStream;
 import de.maxhenkel.radio.Radio;
 import de.maxhenkel.radio.RadioVoicechatPlugin;
 import de.maxhenkel.voicechat.api.Position;
@@ -17,15 +19,24 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nullable;
+import javax.sound.sampled.*;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.ByteBuffer;
+import java.nio.ShortBuffer;
 import java.util.UUID;
 import java.util.function.Supplier;
 
 public class RadioStream implements Supplier<short[]> {
+
+    private static final int BITS_PER_SAMPLE = 16;
+    private static final int FRAME_SIZE = 960;
+    private static final int AUDIO_FRAMES_PER_SECOND = 50; // 20000000ns -> 0.02s per frame
+    private static final AudioFormat SVC_FORMAT = new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, 48000, BITS_PER_SAMPLE, 1, FRAME_SIZE, AUDIO_FRAMES_PER_SECOND, false); // unsure on endienness
 
     private final RadioData radioData;
     private final UUID id;
@@ -36,11 +47,9 @@ public class RadioStream implements Supplier<short[]> {
     @Nullable
     private AudioPlayer audioPlayer;
     @Nullable
-    private Bitstream bitstream;
+    private AudioInputStream radioStationStream;
     @Nullable
-    private Decoder decoder;
-    @Nullable
-    private StreamConverter streamConverter;
+    private AudioInputStream convertedStream;
 
     public RadioStream(RadioData radioData, ServerLevel serverLevel, BlockPos position) {
         this.radioData = radioData;
@@ -96,9 +105,24 @@ public class RadioStream implements Supplier<short[]> {
         this.channel.setCategory(RadioVoicechatPlugin.RADIOS_CATEGORY);
         this.audioPlayer = api.createAudioPlayer(this.channel, api.createEncoder(OpusEncoderMode.AUDIO), this);
 
-        InputStream input = new URI(radioData.getUrl()).toURL().openStream();
-        this.bitstream = new Bitstream(new BufferedInputStream(input));
-        this.decoder = new Decoder();
+        try {
+            URI source = new URI(radioData.getUrl());
+
+            AudioFileFormat remoteFormat = AudioSystem.getAudioFileFormat(source.toURL());
+            this.radioStationStream = AudioSystem.getAudioInputStream(source.toURL());
+
+
+            AudioFormat format = this.radioStationStream.getFormat();
+            this.radioStationStream
+
+            this.convertedStream = AudioSystem.getAudioInputStream(SVC_FORMAT, this.radioStationStream);
+        } catch (UnsupportedAudioFileException err) {
+            Radio.LOGGER.error("Unable to stream radio from url '{}' - unsupported audio format! Try a radio station using 'MP3' or 'HE-ACC'.", radioData.getUrl());
+            return;
+        } catch (IllegalArgumentException err) {
+            Radio.LOGGER.error(err);
+            return;
+        }
 
         if(audioPlayer == null) {
             Radio.LOGGER.error("Unable to start radio stream player -- audio player is null.");
@@ -110,20 +134,30 @@ public class RadioStream implements Supplier<short[]> {
 
     public void stop() {
         channel = null;
+
         if (audioPlayer != null) {
             audioPlayer.stopPlaying();
             audioPlayer = null;
         }
-        if (bitstream != null) {
+
+        if (this.radioStationStream != null) {
             try {
-                bitstream.close();
+                this.radioStationStream.close();
             } catch (Exception e) {
-                Radio.LOGGER.warn("Failed to close bitstream", e);
+                Radio.LOGGER.warn("Failed to close radio station input stream", e);
             }
-            bitstream = null;
+            this.radioStationStream = null;
         }
-        decoder = null;
-        streamConverter = null;
+
+        if (this.convertedStream != null) {
+            try {
+                this.convertedStream.close();
+            } catch (Exception e) {
+                Radio.LOGGER.warn("Failed to close input converter stream", e);
+            }
+            this.convertedStream = null;
+        }
+
         Radio.LOGGER.debug("Stopped radio stream for '{}' ({})", radioData.getStationName(), radioData.getId());
     }
 
@@ -146,34 +180,31 @@ public class RadioStream implements Supplier<short[]> {
         if (channel == null) {
             return null;
         }
-        if (bitstream == null || decoder == null) {
+
+        if (this.convertedStream == null || this.radioStationStream == null) {
             throw new IllegalStateException("Radio stream not started");
         }
+
         checkValid();
         spawnParticle();
+
         try {
-            if (streamConverter != null) {
-                if (!streamConverter.canAdd(lastSampleCount)) {
-                    return streamConverter.getFrame();
-                }
+            short[] frame = new short[FRAME_SIZE];
+            byte[] readBuf = new byte[FRAME_SIZE*2];
+
+            int bytesCopied = this.convertedStream.read(readBuf);
+
+            if(bytesCopied == -1) {
+                Radio.LOGGER.warn("End of converter audio stream!");
+                stop();
+                return null;
             }
 
-            Header frameHeader = bitstream.readFrame();
-            if (frameHeader == null) {
-                throw new IOException("End of stream");
-            }
+            ShortBuffer shortBuffer = ByteBuffer.wrap(readBuf).asShortBuffer();
+            shortBuffer.get(frame);
 
-            SampleBuffer output = (SampleBuffer) decoder.decodeFrame(frameHeader, bitstream);
-            short[] samples = output.getBuffer();
-            lastSampleCount = output.getBufferLength();
-            bitstream.closeFrame();
+            return frame;
 
-            if (streamConverter == null) {
-                streamConverter = new StreamConverter(decoder.getOutputFrequency(), decoder.getOutputChannels());
-            }
-
-            streamConverter.add(samples, 0, output.getBufferLength());
-            return streamConverter.getFrame();
         } catch (Exception e) {
             Radio.LOGGER.warn("Failed to stream audio from {}", radioData.getUrl(), e);
             stop();
