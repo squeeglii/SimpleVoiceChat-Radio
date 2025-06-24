@@ -10,6 +10,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.entity.SkullBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -30,7 +31,7 @@ public class SkullBlockEntityMixin extends BlockEntity {
     }
 
     @Inject(method = "loadAdditional", at = @At("RETURN"))
-    public void load(CompoundTag compoundTag, HolderLookup.Provider provider, CallbackInfo ci) {
+    public void load(ValueInput valueInput, CallbackInfo ci) {
         if (level != null && !level.isClientSide) {
             RadioManager.getInstance().onLoadHead((SkullBlockEntity) (Object) this);
         }
