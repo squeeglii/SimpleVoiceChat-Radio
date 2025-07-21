@@ -42,8 +42,7 @@ public class SkullBlockEntityMixin extends BlockEntity implements IPossibleRadio
 
             if(this.data == null) return;
 
-            if(RadioManager.getInstance().updateRadioStream(this.data, (ServerLevel) this.level, (SkullBlockEntity) (Object) this))
-                ((SkullBlockEntity) (Object) this).setChanged();
+            RadioManager.getInstance().updateRadioStream(this.data, (ServerLevel) this.level, (SkullBlockEntity) (Object) this);
         }
     }
 
@@ -57,8 +56,7 @@ public class SkullBlockEntityMixin extends BlockEntity implements IPossibleRadio
         }
 
         if(this.data != null && this.level != null && !this.level.isClientSide) {
-            if(RadioManager.getInstance().updateRadioStream(this.data, (ServerLevel) this.level, (SkullBlockEntity) (Object) this))
-                ((SkullBlockEntity) (Object) this).setChanged();
+            RadioManager.getInstance().updateRadioStream(this.data, (ServerLevel) this.level, (SkullBlockEntity) (Object) this);
         }
     }
 
@@ -85,8 +83,7 @@ public class SkullBlockEntityMixin extends BlockEntity implements IPossibleRadio
 
         // data is non-null by this point - no need to check.
         if(this.level != null && !this.level.isClientSide) {
-            if(RadioManager.getInstance().updateRadioStream(this.data, (ServerLevel) this.level, (SkullBlockEntity) (Object) this))
-                ((SkullBlockEntity) (Object) this).setChanged();
+            RadioManager.getInstance().updateRadioStream(this.data, (ServerLevel) this.level, (SkullBlockEntity) (Object) this);
         }
     }
 
@@ -102,8 +99,6 @@ public class SkullBlockEntityMixin extends BlockEntity implements IPossibleRadio
     public void setLevel(Level newLevel) {
         Level oldLevel = level;
         super.setLevel(newLevel);
-
-        //todo: ensure the radio channel is properly updated.
 
         if (oldLevel == null && newLevel != null && !newLevel.isClientSide) {
             if(this.data == null)

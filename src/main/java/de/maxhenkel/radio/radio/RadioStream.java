@@ -50,7 +50,7 @@ public class RadioStream implements Supplier<short[]> {
     }
 
     public void init() {
-        if (radioData.isOn()) {
+        if (this.radioData.isOn()) {
             start();
         }
     }
@@ -59,6 +59,12 @@ public class RadioStream implements Supplier<short[]> {
         final Throwable trace = new Throwable();
 
         RadioVoicechatPlugin.runWhenReady(() -> {
+            try {
+                this.preStartInternal(trace);
+            } catch (IOException | URISyntaxException e) {
+                Radio.LOGGER.error("Failed to setup radio stream", e);
+            }
+
             new Thread(() -> {
                 try {
                     this.startInternal(trace);
@@ -70,7 +76,7 @@ public class RadioStream implements Supplier<short[]> {
 
     }
 
-    private void startInternal(Throwable trace) throws IOException, URISyntaxException {
+    private void preStartInternal(Throwable trace) throws IOException, URISyntaxException {
         if (this.radioData.getUrl() == null) {
             Radio.LOGGER.warn("Radio URL is null");
             return;
@@ -78,13 +84,15 @@ public class RadioStream implements Supplier<short[]> {
 
         VoicechatServerApi api = RadioVoicechatPlugin.voicechatServerApi;
         if (api == null) {
-            Radio.LOGGER.debug("Voice chat API is not yet loaded");
-            RadioVoicechatPlugin.runWhenReady(this::start);
+            Radio.LOGGER.error("Voice chat API is not yet loaded");
+            //RadioVoicechatPlugin.runWhenReady(this::start); -- #start() should account for this.
             return;
         }
 
         if (this.channel != null) {
-            stop();
+            Radio.LOGGER.warn("Voice channel exists already. Ignoring.");
+            return;
+            //stop();
         }
 
         if(this.serverLevel == null) {
@@ -94,7 +102,7 @@ public class RadioStream implements Supplier<short[]> {
 
         de.maxhenkel.voicechat.api.ServerLevel level = api.fromServerLevel(this.serverLevel);
         Position pos = api.createPosition(this.position.getX() + 0.5D, this.position.getY() + 0.5D, this.position.getZ() + 0.5D);
-        this.channel = api.createLocationalAudioChannel(this.id, level, pos);
+        this.channel = api.createLocationalAudioChannel(UUID.randomUUID(), level, pos);
 
         if(this.channel == null) {
             Radio.LOGGER.error("Failed to create locational audio channel.", trace);
@@ -105,14 +113,21 @@ public class RadioStream implements Supplier<short[]> {
         this.channel.setCategory(RadioVoicechatPlugin.RADIOS_CATEGORY);
         this.audioPlayer = api.createAudioPlayer(this.channel, api.createEncoder(OpusEncoderMode.AUDIO), this);
 
-        InputStream input = new URI(radioData.getUrl()).toURL().openStream();
-        this.bitstream = new Bitstream(new BufferedInputStream(input));
-        this.decoder = new Decoder();
-
-        if(audioPlayer == null) {
-            Radio.LOGGER.error("Unable to start radio stream player -- audio player is null.");
+        if(this.audioPlayer == null) {
+            Radio.LOGGER.error("Could not initialise radio stream player -- audio player is null.", trace);
             return;
         }
+    }
+
+    private void startInternal(Throwable trace) throws IOException, URISyntaxException {
+        if(this.audioPlayer == null) {
+            Radio.LOGGER.debug("Unable to start radio stream player -- was the player halted too quickly?", trace);
+            return;
+        }
+
+        InputStream input = new URI(this.radioData.getUrl()).toURL().openStream();
+        this.bitstream = new Bitstream(new BufferedInputStream(input));
+        this.decoder = new Decoder();
 
         this.audioPlayer.startPlaying();
     }

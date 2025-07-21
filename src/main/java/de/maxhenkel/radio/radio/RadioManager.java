@@ -59,14 +59,12 @@ public class RadioManager {
         RadioStream radioStream = new RadioStream(radioData, serverLevel, skullBlockEntity.getBlockPos());
         Radio.LOGGER.debug("Loaded radio stream for '{}' ({})", radioData.getStationName(), radioData.getId());
         radioStream.init();
-        RadioStream oldStream = radioStreams.put(radioData.getId(), radioStream);
+        RadioStream oldStream = this.radioStreams.put(radioData.getId(), radioStream);
 
         if (oldStream != null) {
             oldStream.close();
             Radio.LOGGER.warn("Replacing radio stream for '{}' ({})", radioData.getStationName(), radioData.getId());
         }
-
-        this.updateHeadOnState(radioData.getId(), radioData.isOn());
 
         return idChanged;
     }
@@ -102,8 +100,6 @@ public class RadioManager {
     }
 
     public void updateHeadOnState(UUID id, boolean on) {
-        Radio.LOGGER.info("Updating head state - on? %s".formatted(on));
-
         RadioStream radioStream = this.radioStreams.get(id);
         if (radioStream == null) {
             Radio.LOGGER.info("No stream detected.");

@@ -75,8 +75,6 @@ public class RadioData {
         return false;
     }
 
-
-
     public void serialiseIntoItemStack(ItemStack item) {
         CustomData data = item.get(DataComponents.CUSTOM_DATA);
         CustomData newData = this.saveToNewItemData(data);
