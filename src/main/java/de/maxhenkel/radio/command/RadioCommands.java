@@ -8,10 +8,13 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import de.maxhenkel.radio.Radio;
 import de.maxhenkel.radio.radio.RadioData;
+import de.maxhenkel.radio.radio.RadioItem;
 import de.maxhenkel.voicechat.api.Player;
+import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.UUID;
@@ -60,9 +63,14 @@ public class RadioCommands {
 
 
     private static int runCommand(String url, String stationName, ServerPlayer player, float range) {
-        RadioData radioData = new RadioData(UUID.randomUUID(), url, stationName, false, range);
-        player.getInventory().add(radioData.toItemWithNoId());
-        return 1;
+        try {
+            player.getInventory().add(RadioItem.newRadio(url, stationName, false, range));
+            player.sendSystemMessage(Component.literal("Provided you with a radio for '%s'.".formatted(stationName)));
+            return 1;
+        } catch (Exception ex) {
+            player.sendSystemMessage(Component.literal("There was an error while providing you with a radio.").withStyle(ChatFormatting.RED));
+            return 0;
+        }
     }
 
 }

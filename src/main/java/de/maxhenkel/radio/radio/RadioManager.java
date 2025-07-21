@@ -2,6 +2,7 @@ package de.maxhenkel.radio.radio;
 
 import com.mojang.authlib.GameProfile;
 import de.maxhenkel.radio.Radio;
+import de.maxhenkel.radio.utils.IPossibleRadioBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
@@ -11,9 +12,9 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.SkullBlockEntity;
 import net.minecraft.world.level.chunk.LevelChunk;
 
-import javax.annotation.Nullable;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 public class RadioManager {
@@ -24,23 +25,37 @@ public class RadioManager {
         radioStreams = new HashMap<>();
     }
 
-    public void onLoadHead(SkullBlockEntity skullBlockEntity) {
+    @Deprecated(since = "2.0")
+    public Optional<RadioData> loadHeadFromGameProfile(SkullBlockEntity skullBlockEntity) {
         if (!(skullBlockEntity.getLevel() instanceof ServerLevel serverLevel))
-            return;
+            return Optional.empty();
 
         ResolvableProfile resolvableProfile = skullBlockEntity.getOwnerProfile();
-        if(resolvableProfile == null) return;
+        if(resolvableProfile == null) return Optional.empty();
 
-        GameProfile ownerProfile = resolvableProfile.gameProfile();
-        RadioData radioData = RadioData.fromGameProfile(ownerProfile);
-        if (radioData == null) return;
+        // todo: Deprecate storing data in player heads -- CustomData works perfectly fine.
+        //       The playerhead loading will remain in place, but new data will be saved
+        //       to CustomData instead of the GameProfile
+        //       -- v
 
-        this.updateStoredRadioData(skullBlockEntity, serverLevel, radioData, ownerProfile);
+        try {
+            GameProfile ownerProfile = resolvableProfile.gameProfile();
+            RadioData radioData = RadioData.fromGameProfile(ownerProfile);
+            if (radioData == null) return Optional.empty();
+
+            return Optional.of(radioData);
+
+            //this.updateStoredRadioData(skullBlockEntity, serverLevel, radioData, ownerProfile);
+        } catch (Exception err) {
+            Radio.LOGGER.error("Loading legacy format radio data failed", err);
+            return Optional.empty();
+        }
     }
 
-    private void updateStoredRadioData(SkullBlockEntity skullBlockEntity, ServerLevel serverLevel, RadioData radioData, GameProfile ownerProfile) {
-        // Set the UUID if none was present (block was just placed)
-        radioData.updateProfile(ownerProfile);
+    /** @return true if the data of the RadioData has been changed. */
+    public boolean updateRadioStream(RadioData radioData, ServerLevel serverLevel, SkullBlockEntity skullBlockEntity) {
+        boolean idChanged = radioData.assignIdIfNil();
+
         RadioStream radioStream = new RadioStream(radioData, serverLevel, skullBlockEntity.getBlockPos());
         Radio.LOGGER.debug("Loaded radio stream for '{}' ({})", radioData.getStationName(), radioData.getId());
         radioStream.init();
@@ -50,6 +65,10 @@ public class RadioManager {
             oldStream.close();
             Radio.LOGGER.warn("Replacing radio stream for '{}' ({})", radioData.getStationName(), radioData.getId());
         }
+
+        this.updateHeadOnState(radioData.getId(), radioData.isOn());
+
+        return idChanged;
     }
 
     public static boolean isValidRadioLocation(UUID id, BlockPos pos, ServerLevel level) {
@@ -57,19 +76,16 @@ public class RadioManager {
             return false;
 
         BlockEntity blockEntity = level.getBlockEntity(pos);
-        if (!(blockEntity instanceof SkullBlockEntity skullBlockEntity))
+
+        if(!(blockEntity instanceof IPossibleRadioBlock radioBlock))
             return false;
 
-        ResolvableProfile resolvableProfile = skullBlockEntity.getOwnerProfile();
-        if(resolvableProfile == null) return false;
-
-        GameProfile ownerProfile = resolvableProfile.gameProfile();
-        RadioData radioData = RadioData.fromGameProfile(ownerProfile);
-        return radioData != null && radioData.getId().equals(id);
+        return radioBlock.radio$isRadio() && radioBlock.radio$getRadioData().getId().equals(id);
     }
 
     public void onRemoveHead(UUID id) {
-        RadioStream radioStream = radioStreams.remove(id);
+        RadioStream radioStream = this.radioStreams.remove(id);
+
         if (radioStream != null) {
             radioStream.close();
             Radio.LOGGER.debug("Removed radio stream for '{}' ({})", radioStream.getRadioData().getStationName(), radioStream.getRadioData().getId());
@@ -86,10 +102,14 @@ public class RadioManager {
     }
 
     public void updateHeadOnState(UUID id, boolean on) {
-        RadioStream radioStream = radioStreams.get(id);
+        Radio.LOGGER.info("Updating head state - on? %s".formatted(on));
+
+        RadioStream radioStream = this.radioStreams.get(id);
         if (radioStream == null) {
+            Radio.LOGGER.info("No stream detected.");
             return;
         }
+
         if (on) {
             radioStream.start();
         } else {
@@ -114,8 +134,8 @@ public class RadioManager {
     }
 
     public void clear() {
-        radioStreams.values().forEach(RadioStream::close);
-        radioStreams.clear();
+        this.radioStreams.values().forEach(RadioStream::close);
+        this.radioStreams.clear();
     }
 
     private static RadioManager instance;

@@ -7,6 +7,7 @@ import com.mojang.authlib.minecraft.MinecraftProfileTexture;
 import com.mojang.authlib.properties.Property;
 import com.mojang.authlib.properties.PropertyMap;
 import com.mojang.util.UUIDTypeAdapter;
+import de.maxhenkel.radio.radio.RadioData;
 import it.unimi.dsi.fastutil.objects.ReferenceSortedSets;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
@@ -23,29 +24,17 @@ import java.util.*;
 
 public class HeadUtils {
 
-    public static final String NBT_SOUND_RANGE = "sound_radius";
+    private static final Gson gson = new GsonBuilder().registerTypeAdapter(UUID.class, new UUIDTypeAdapter()).create();
 
-    public static ItemStack createHead(String itemName, List<Component> loreComponents, GameProfile gameProfile) {
+    public static ItemStack createHead(UUID profileUUID, String internalName, String skinURL) {
         ItemStack stack = new ItemStack(Items.PLAYER_HEAD);
+        GameProfile gameProfile = HeadUtils.getGameProfile(profileUUID, internalName, skinURL);
 
-        MutableComponent nameComponent = Component.literal(itemName).withStyle(
-                style -> style
-                        .withItalic(false)
-                        .withColor(ChatFormatting.WHITE)
-        );
-
-        ItemLore lore = new ItemLore(loreComponents);
         ResolvableProfile resolvableProfile = new ResolvableProfile(gameProfile);
-
-        stack.set(DataComponents.ITEM_NAME, nameComponent);
-        stack.set(DataComponents.LORE, lore);
-        stack.set(DataComponents.TOOLTIP_DISPLAY, new TooltipDisplay(false, ReferenceSortedSets.singleton(DataComponents.PROFILE)));
         stack.set(DataComponents.PROFILE, resolvableProfile);
 
         return stack;
     }
-
-    private static final Gson gson = new GsonBuilder().registerTypeAdapter(UUID.class, new UUIDTypeAdapter()).create();
 
     public static GameProfile getGameProfile(UUID uuid, String name, String skinUrl) {
         GameProfile gameProfile = new GameProfile(uuid, name);

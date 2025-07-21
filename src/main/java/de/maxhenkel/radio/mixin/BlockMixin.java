@@ -2,7 +2,9 @@ package de.maxhenkel.radio.mixin;
 
 import com.mojang.authlib.GameProfile;
 import de.maxhenkel.radio.radio.RadioData;
+import de.maxhenkel.radio.radio.RadioItem;
 import de.maxhenkel.radio.radio.RadioManager;
+import de.maxhenkel.radio.utils.IPossibleRadioBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -33,18 +35,13 @@ public class BlockMixin {
                                        !blockState.getBlock().equals(Blocks.PLAYER_WALL_HEAD);
         if (isNotPlayerHeadBlock) return;
 
-        if (!(blockEntity instanceof SkullBlockEntity skullBlockEntity))
+        if (!(blockEntity instanceof IPossibleRadioBlock radioBlock))
             return;
 
-        ResolvableProfile profile = skullBlockEntity.getOwnerProfile();;
-        if (profile == null) return;
-
-        GameProfile ownerProfile = profile.gameProfile();
-
-        RadioData radioData = RadioData.fromGameProfile(ownerProfile);
-        if (radioData != null) {
+        if (radioBlock.radio$isRadio()) {
+            RadioData radioData = radioBlock.radio$getRadioData();
             RadioManager.getInstance().onRemoveHead(radioData.getId());
-            ItemStack speakerItem = radioData.toItemWithNoId();
+            ItemStack speakerItem = RadioItem.fromData(radioData);
             Block.popResource(level, blockPos, speakerItem);
             ci.cancel();
         }
@@ -61,17 +58,11 @@ public class BlockMixin {
 
         BlockEntity blockEntity = level.getBlockEntity(blockPos);
 
-        if (!(blockEntity instanceof SkullBlockEntity skullBlockEntity))
+        if (!(blockEntity instanceof IPossibleRadioBlock radioBlock))
             return;
 
-        ResolvableProfile resolvableProfile = skullBlockEntity.getOwnerProfile();
-        if (resolvableProfile == null) return;
-
-        GameProfile ownerProfile = resolvableProfile.gameProfile();
-        RadioData radioData = RadioData.fromGameProfile(ownerProfile);
-
-        if (radioData != null)
-            RadioManager.getInstance().onRemoveHead(radioData.getId());
+        if (radioBlock.radio$isRadio())
+            RadioManager.getInstance().onRemoveHead(radioBlock.radio$getRadioData().getId());
     }
 
     // TODO Stop radio when block is broken by explosion or non-player

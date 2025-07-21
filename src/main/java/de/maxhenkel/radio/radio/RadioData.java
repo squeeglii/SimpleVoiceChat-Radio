@@ -2,13 +2,15 @@ package de.maxhenkel.radio.radio;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
-import com.mojang.authlib.properties.PropertyMap;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import de.maxhenkel.radio.Radio;
-import de.maxhenkel.radio.utils.HeadUtils;
-import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
-import net.minecraft.network.chat.Component;
+import net.minecraft.core.UUIDUtil;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomData;
 
 import javax.annotation.Nullable;
 import java.util.*;
@@ -18,17 +20,37 @@ public class RadioData {
     public static final UUID RADIO_ID = UUID.fromString("e333ec57-548d-41a1-aa4a-05bce4cfd028");
     public static final String RADIO_NAME = "Radio";
 
+    public static final String NBT_CATEGORY = "radio";
     public static final String ID_TAG = "id";
     public static final String STREAM_URL_TAG = "stream_url";
     public static final String STATION_NAME_TAG = "station_name";
     public static final String ON_TAG = "on";
     public static final String RANGE_TAG = "range";
 
-    private final UUID id;
+    private UUID id;
     private String url;
     private String stationName;
     private boolean on;
     private float range;
+
+    public static final Codec<RadioData> CODEC = RecordCodecBuilder.create(builder ->
+            builder.group(
+                    UUIDUtil.CODEC.fieldOf("id").orElseGet(UUID::randomUUID).forGetter(RadioData::getId),
+                    Codec.STRING.fieldOf("stream_url").forGetter(RadioData::getUrl),
+                    Codec.STRING.fieldOf("name").forGetter(RadioData::getStationName),
+                    Codec.BOOL.fieldOf("active").forGetter(RadioData::isOn),
+                    Codec.FLOAT.fieldOf("range").forGetter(RadioData::getRange)
+            ).apply(builder, RadioData::new)
+    );
+
+    public static final Codec<RadioData> ITEM_CODEC = RecordCodecBuilder.create(builder ->
+            builder.group(
+                    Codec.STRING.fieldOf("stream_url").forGetter(RadioData::getUrl),
+                    Codec.STRING.fieldOf("name").forGetter(RadioData::getStationName),
+                    Codec.BOOL.fieldOf("active").forGetter(RadioData::isOn),
+                    Codec.FLOAT.fieldOf("range").forGetter(RadioData::getRange)
+            ).apply(builder, RadioData::createAnonymousRadioData)
+    );
 
     public RadioData(UUID id, String url, String stationName, boolean on, float range) {
         this.id = id;
@@ -38,10 +60,51 @@ public class RadioData {
         this.range = range;
     }
 
-    public RadioData(UUID id) {
+    @Deprecated(since = "2.0")
+    private RadioData(UUID id) {
         this.id = id;
         this.range = -1.0f;
     }
+
+    public boolean assignIdIfNil() {
+        if(this.id == Util.NIL_UUID) {
+            this.id = UUID.randomUUID();
+            return true;
+        }
+
+        return false;
+    }
+
+
+
+    public void serialiseIntoItemStack(ItemStack item) {
+        CustomData data = item.get(DataComponents.CUSTOM_DATA);
+        CustomData newData = this.saveToNewItemData(data);
+        item.set(DataComponents.CUSTOM_DATA, newData);
+    }
+
+    public CustomData saveToNewItemData() {
+        return this.saveToNewItemData(null);
+    }
+
+    public CustomData saveToNewItemData(CustomData mergeWith) {
+        CompoundTag workingTag = mergeWith == null
+                ? new CompoundTag()
+                : mergeWith.copyTag();
+
+        workingTag.store(NBT_CATEGORY, ITEM_CODEC, this);
+
+        return CustomData.of(workingTag);
+    }
+
+    public void toggleOn() {
+        this.on = !this.on;
+    }
+
+    public boolean isRangeDefault() {
+        return this.range < 0;
+    }
+
 
     public UUID getId() {
         return id;
@@ -79,9 +142,12 @@ public class RadioData {
         this.range = range;
     }
 
+
+
+    @Deprecated(since = "2.0")
     @Nullable
     public static RadioData fromGameProfile(GameProfile gameProfile) {
-        if (!isRadio(gameProfile)) {
+        if (!hasLegacyRadioData(gameProfile)) {
             return null;
         }
 
@@ -102,28 +168,15 @@ public class RadioData {
         radioData.on = Boolean.parseBoolean(getValue(gameProfile, ON_TAG));
         radioData.range = getFloatValueOrElse(gameProfile, RANGE_TAG, -1.0f);
 
+        gameProfile.getProperties().removeAll(STREAM_URL_TAG);
+        gameProfile.getProperties().removeAll(STATION_NAME_TAG);
+        gameProfile.getProperties().removeAll(ON_TAG);
+        gameProfile.getProperties().removeAll(RANGE_TAG);
+
         return radioData;
     }
 
-    public GameProfile toGameProfile() {
-        GameProfile gameProfile = HeadUtils.getGameProfile(RADIO_ID, RADIO_NAME, Radio.SERVER_CONFIG.radioSkinUrl.get());
-        this.updateProfile(gameProfile);
-        return gameProfile;
-    }
-
-    public void updateProfile(GameProfile gameProfile) {
-        if (id.equals(Util.NIL_UUID)) {
-            removeValue(gameProfile, ID_TAG);
-        } else {
-            putValue(gameProfile, ID_TAG, this.id.toString());
-        }
-
-        putValue(gameProfile, STREAM_URL_TAG, this.url);
-        putValue(gameProfile, STATION_NAME_TAG, this.stationName);
-        putValue(gameProfile, ON_TAG, String.valueOf(this.on));
-        putValue(gameProfile, RANGE_TAG, String.valueOf(this.range));
-    }
-
+    @Deprecated(since = "2.0")
     @Nullable
     private static String getValue(GameProfile gameProfile, String key) {
         return gameProfile.getProperties().get(key)
@@ -133,6 +186,7 @@ public class RadioData {
                 .orElse(null);
     }
 
+    @Deprecated(since = "2.0")
     private static float getFloatValueOrElse(GameProfile gameProfile, String key, float orElse) {
         String value = getValue(gameProfile, key);
 
@@ -146,40 +200,15 @@ public class RadioData {
         }
     }
 
-    private static void putValue(GameProfile gameProfile, String key, String value) {
-        PropertyMap properties = gameProfile.getProperties();
-        List<Property> props = new ArrayList<>();
-        props.add(new Property(key, value));
-        properties.replaceValues(key, props);
-    }
-
-    private static void removeValue(GameProfile gameProfile, String key) {
-        PropertyMap properties = gameProfile.getProperties();
-        properties.replaceValues(key, new ArrayList<>());
-    }
-
-    private static ItemStack createRadio(RadioData radioData) {
-        return HeadUtils.createHead(
-                RADIO_NAME,
-                Collections.singletonList(
-                        Component.literal(radioData.stationName)
-                                 .withStyle(style -> style.withItalic(false))
-                                 .withStyle(ChatFormatting.GRAY)
-                ),
-                radioData.toGameProfile()
-        );
-    }
-
-    public ItemStack toItemWithNoId() {
-        RadioData radioData = new RadioData(Util.NIL_UUID, this.url, this.stationName, false, this.range);
-        return createRadio(radioData);
-    }
-
-    public static boolean isRadio(GameProfile profile) {
+    public static boolean hasLegacyRadioData(GameProfile profile) {
         if (profile == null) {
             return false;
         }
         return profile.getId().equals(RADIO_ID);
+    }
+
+    public static RadioData createAnonymousRadioData(String url, String stationName, boolean on, float range) {
+        return new RadioData(Util.NIL_UUID, url, stationName, on, range);
     }
 
 }
