@@ -6,6 +6,7 @@ import de.maxhenkel.voicechat.api.VoicechatServerApi;
 import de.maxhenkel.voicechat.api.VolumeCategory;
 import de.maxhenkel.voicechat.api.events.EventRegistration;
 import de.maxhenkel.voicechat.api.events.VoicechatServerStartedEvent;
+import de.maxhenkel.voicechat.api.events.VoicechatServerStoppedEvent;
 
 import javax.annotation.Nullable;
 import javax.imageio.ImageIO;
@@ -42,6 +43,7 @@ public class RadioVoicechatPlugin implements VoicechatPlugin {
     @Override
     public void registerEvents(EventRegistration registration) {
         registration.registerEvent(VoicechatServerStartedEvent.class, this::onServerStarted);
+        registration.registerEvent(VoicechatServerStoppedEvent.class, this::onServerStop);
     }
 
     private void onServerStarted(VoicechatServerStartedEvent event) {
@@ -59,6 +61,10 @@ public class RadioVoicechatPlugin implements VoicechatPlugin {
             runnables.forEach(Runnable::run);
             runnables.clear();
         }
+    }
+
+    private void onServerStop(VoicechatServerStoppedEvent event) {
+        voicechatServerApi = null;
     }
 
     public static void runWhenReady(Runnable runnable) {

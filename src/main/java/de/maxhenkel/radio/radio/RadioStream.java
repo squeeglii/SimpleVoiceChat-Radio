@@ -56,17 +56,21 @@ public class RadioStream implements Supplier<short[]> {
     }
 
     public void start() {
-        new Thread(() -> {
-            try {
-                this.startInternal();
-            } catch (IOException | URISyntaxException e) {
-                Radio.LOGGER.error("Failed to start radio stream", e);
-            }
-        }, "RadioStreamStarter-%s".formatted(id)).start();
+        final Throwable trace = new Throwable();
+
+        RadioVoicechatPlugin.runWhenReady(() -> {
+            new Thread(() -> {
+                try {
+                    this.startInternal(trace);
+                } catch (IOException | URISyntaxException e) {
+                    Radio.LOGGER.error("Failed to start radio stream", e);
+                }
+            }, "RadioStreamStarter-%s".formatted(id)).start();
+        });
 
     }
 
-    private void startInternal() throws IOException, URISyntaxException {
+    private void startInternal(Throwable trace) throws IOException, URISyntaxException {
         if (this.radioData.getUrl() == null) {
             Radio.LOGGER.warn("Radio URL is null");
             return;
@@ -83,12 +87,17 @@ public class RadioStream implements Supplier<short[]> {
             stop();
         }
 
+        if(this.serverLevel == null) {
+            Radio.LOGGER.error("Server level is null while trying to create radio channel");
+            return;
+        }
+
         de.maxhenkel.voicechat.api.ServerLevel level = api.fromServerLevel(this.serverLevel);
         Position pos = api.createPosition(this.position.getX() + 0.5D, this.position.getY() + 0.5D, this.position.getZ() + 0.5D);
-        this.channel = api.createLocationalAudioChannel(UUID.randomUUID(), level, pos);
+        this.channel = api.createLocationalAudioChannel(this.id, level, pos);
 
         if(this.channel == null) {
-            Radio.LOGGER.error("Failed to create locational audio channel for .");
+            Radio.LOGGER.error("Failed to create locational audio channel.", trace);
             return;
         }
 
