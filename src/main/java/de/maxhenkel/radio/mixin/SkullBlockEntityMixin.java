@@ -4,9 +4,11 @@ import de.maxhenkel.radio.radio.RadioData;
 import de.maxhenkel.radio.radio.RadioManager;
 import de.maxhenkel.radio.utils.IPossibleRadioBlock;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponentGetter;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.ResolvableProfile;
@@ -15,8 +17,6 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.entity.SkullBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -48,8 +48,8 @@ public class SkullBlockEntityMixin extends BlockEntity implements IPossibleRadio
 
     // block saving / loading
     @Inject(method = "loadAdditional", at = @At("RETURN"))
-    public void load(ValueInput valueInput, CallbackInfo ci) {
-        this.data = valueInput.read(RadioData.NBT_CATEGORY, RadioData.CODEC).orElse(null);
+    public void load(CompoundTag compoundTag, HolderLookup.Provider provider, CallbackInfo ci) {
+        this.data = compoundTag.read(RadioData.NBT_CATEGORY, RadioData.CODEC).orElse(null);
 
         if (this.data == null && this.level != null && !this.level.isClientSide) {
             this.data = RadioManager.getInstance().loadHeadFromGameProfile((SkullBlockEntity) (Object) this).orElse(null);
@@ -61,9 +61,9 @@ public class SkullBlockEntityMixin extends BlockEntity implements IPossibleRadio
     }
 
     @Inject(method = "saveAdditional", at = @At("RETURN"))
-    public void save(ValueOutput valueOutput, CallbackInfo ci) {
+    public void save(CompoundTag compoundTag, HolderLookup.Provider provider, CallbackInfo ci) {
         if(this.data != null) {
-            valueOutput.store(RadioData.NBT_CATEGORY, RadioData.CODEC, this.data);
+            compoundTag.store(RadioData.NBT_CATEGORY, RadioData.CODEC, this.data);
         }
     }
 
