@@ -2,6 +2,8 @@ package de.maxhenkel.radio.radio;
 
 import de.maxhenkel.radio.Radio;
 import de.maxhenkel.radio.RadioVoicechatPlugin;
+import de.maxhenkel.radio.utils.HeadUtils;
+import de.maxhenkel.radio.utils.RadioStreamState;
 import de.maxhenkel.voicechat.api.Position;
 import de.maxhenkel.voicechat.api.VoicechatServerApi;
 import de.maxhenkel.voicechat.api.audiochannel.AudioPlayer;
@@ -11,6 +13,7 @@ import javazoom.jl.decoder.Bitstream;
 import javazoom.jl.decoder.Decoder;
 import javazoom.jl.decoder.Header;
 import javazoom.jl.decoder.SampleBuffer;
+import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
@@ -31,6 +34,10 @@ public class RadioStream implements Supplier<short[]> {
     private final UUID id;
     private final ServerLevel serverLevel;
     private final BlockPos position;
+
+    private UUID lastKnownChannelId;
+    private RadioStreamState state;
+
     @Nullable
     private LocationalAudioChannel channel;
     @Nullable
@@ -47,11 +54,18 @@ public class RadioStream implements Supplier<short[]> {
         this.id = radioData.getId();
         this.serverLevel = serverLevel;
         this.position = position;
+
+        this.lastKnownChannelId = Util.NIL_UUID;
+        this.state = RadioStreamState.FRESH;
     }
 
     public void init() {
-        if (this.radioData.isOn()) {
-            start();
+        if(!this.radioData.isOn()) return;
+
+        if (this.state.canBeStarted()) {
+            this.start();
+        } else {
+            Radio.LOGGER.warn("Tried to start pre-used radio station in state [{}]", this.state);
         }
     }
 
@@ -60,15 +74,24 @@ public class RadioStream implements Supplier<short[]> {
 
         RadioVoicechatPlugin.runWhenReady(() -> {
             try {
-                this.preStartInternal(trace);
+                if(!this.preStartInternal(trace)) {
+                    this.state = RadioStreamState.ERRORED_PRE_INIT;
+                    return;
+                }
             } catch (IOException | URISyntaxException e) {
+                this.state = RadioStreamState.ERRORED_PRE_INIT;
                 Radio.LOGGER.error("Failed to setup radio stream", e);
+                return;
             }
 
             new Thread(() -> {
                 try {
-                    this.startInternal(trace);
+                    this.state = this.startInternal(trace)
+                            ? RadioStreamState.ACTIVE
+                            : RadioStreamState.ERRORED;
+
                 } catch (IOException | URISyntaxException e) {
+                    this.state = RadioStreamState.ERRORED;
                     Radio.LOGGER.error("Failed to start radio stream", e);
                 }
             }, "RadioStreamStarter-%s".formatted(id)).start();
@@ -76,37 +99,38 @@ public class RadioStream implements Supplier<short[]> {
 
     }
 
-    private void preStartInternal(Throwable trace) throws IOException, URISyntaxException {
+    private boolean preStartInternal(Throwable trace) throws IOException, URISyntaxException {
         if (this.radioData.getUrl() == null) {
             Radio.LOGGER.warn("Radio URL is null");
-            return;
+            return false;
         }
 
         VoicechatServerApi api = RadioVoicechatPlugin.voicechatServerApi;
         if (api == null) {
             Radio.LOGGER.error("Voice chat API is not yet loaded");
             //RadioVoicechatPlugin.runWhenReady(this::start); -- #start() should account for this.
-            return;
+            return false;
         }
 
         if (this.channel != null) {
             Radio.LOGGER.warn("Voice channel exists already. Ignoring.");
-            return;
+            return false;
             //stop();
         }
 
         if(this.serverLevel == null) {
             Radio.LOGGER.error("Server level is null while trying to create radio channel");
-            return;
+            return false;
         }
 
         de.maxhenkel.voicechat.api.ServerLevel level = api.fromServerLevel(this.serverLevel);
         Position pos = api.createPosition(this.position.getX() + 0.5D, this.position.getY() + 0.5D, this.position.getZ() + 0.5D);
-        this.channel = api.createLocationalAudioChannel(UUID.randomUUID(), level, pos);
+        this.lastKnownChannelId = UUID.randomUUID();
+        this.channel = api.createLocationalAudioChannel(this.lastKnownChannelId, level, pos);
 
         if(this.channel == null) {
             Radio.LOGGER.error("Failed to create locational audio channel.", trace);
-            return;
+            return false;
         }
 
         this.channel.setDistance(this.getOutputChannelRange());
@@ -115,14 +139,16 @@ public class RadioStream implements Supplier<short[]> {
 
         if(this.audioPlayer == null) {
             Radio.LOGGER.error("Could not initialise radio stream player -- audio player is null.", trace);
-            return;
+            return false;
         }
+
+        return true;
     }
 
-    private void startInternal(Throwable trace) throws IOException, URISyntaxException {
+    private boolean startInternal(Throwable trace) throws IOException, URISyntaxException {
         if(this.audioPlayer == null) {
             Radio.LOGGER.debug("Unable to start radio stream player -- was the player halted too quickly?", trace);
-            return;
+            return false;
         }
 
         InputStream input = new URI(this.radioData.getUrl()).toURL().openStream();
@@ -130,9 +156,12 @@ public class RadioStream implements Supplier<short[]> {
         this.decoder = new Decoder();
 
         this.audioPlayer.startPlaying();
+        this.state = RadioStreamState.ACTIVE;
+        return true;
     }
 
     public void stop() {
+        Radio.LOGGER.debug("Stopping radio stream for '{}' ({})", radioData.getStationName(), radioData.getId());
         channel = null;
         if (audioPlayer != null) {
             audioPlayer.stopPlaying();
@@ -148,6 +177,11 @@ public class RadioStream implements Supplier<short[]> {
         }
         decoder = null;
         streamConverter = null;
+
+        // update state only if it hasn't yet been updated.
+        if(this.state.isActive()) {
+            this.state = RadioStreamState.STOPPED;
+        }
         Radio.LOGGER.debug("Stopped radio stream for '{}' ({})", radioData.getStationName(), radioData.getId());
     }
 
@@ -184,6 +218,7 @@ public class RadioStream implements Supplier<short[]> {
 
             Header frameHeader = bitstream.readFrame();
             if (frameHeader == null) {
+                this.state = RadioStreamState.ERRORED_NO_CLEANUP;
                 throw new IOException("End of stream");
             }
 
@@ -201,6 +236,7 @@ public class RadioStream implements Supplier<short[]> {
         } catch (Exception e) {
             Radio.LOGGER.warn("Failed to stream audio from {}", radioData.getUrl(), e);
             stop();
+            this.state = RadioStreamState.ERRORED;
             return null;
         }
     }
@@ -246,10 +282,18 @@ public class RadioStream implements Supplier<short[]> {
     }
 
 
-    private float getOutputChannelRange() {
+    public float getOutputChannelRange() {
         float range = this.radioData.getRange();
         return range > 0
                 ? range
                 : Radio.SERVER_CONFIG.radioRange.get().floatValue();
+    }
+
+    public UUID getLastKnownChannelId() {
+        return this.lastKnownChannelId;
+    }
+
+    public RadioStreamState getState() {
+        return this.state;
     }
 }

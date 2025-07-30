@@ -22,7 +22,7 @@ public class RadioManager {
     private final Map<UUID, RadioStream> radioStreams;
 
     public RadioManager() {
-        radioStreams = new HashMap<>();
+        this.radioStreams = new HashMap<>();
     }
 
     @Deprecated(since = "2.0")
@@ -63,10 +63,18 @@ public class RadioManager {
 
         if (oldStream != null) {
             oldStream.close();
-            Radio.LOGGER.warn("Replacing radio stream for '{}' ({})", radioData.getStationName(), radioData.getId());
+            Radio.LOGGER.warn("Replacing radio stream for '{}' ({})  - Old stream state was '{}'", radioData.getStationName(), radioData.getId(), oldStream.getState());
         }
 
         return idChanged;
+    }
+
+    public Optional<RadioStream> getRadioStream(UUID id) {
+        return Optional.ofNullable(this.radioStreams.get(id));
+    }
+
+    public Optional<RadioStream> getRadioStream(RadioData radio) {
+        return this.getRadioStream(radio.getId());
     }
 
     public static boolean isValidRadioLocation(UUID id, BlockPos pos, ServerLevel level) {
