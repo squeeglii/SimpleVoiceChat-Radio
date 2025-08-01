@@ -5,10 +5,13 @@ import com.mojang.authlib.properties.Property;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import de.maxhenkel.radio.Radio;
+import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 
@@ -18,7 +21,6 @@ import java.util.*;
 public class RadioData {
 
     public static final UUID RADIO_ID = UUID.fromString("e333ec57-548d-41a1-aa4a-05bce4cfd028");
-    public static final String RADIO_NAME = "Radio";
 
     public static final String NBT_CATEGORY = "radio";
     public static final String ID_TAG = "id";
@@ -138,6 +140,40 @@ public class RadioData {
 
     public void setRange(float range) {
         this.range = range;
+    }
+
+    public List<Component> toMessage(BlockPos blockPos) {
+        ChatFormatting[] body = { ChatFormatting.GRAY, ChatFormatting.ITALIC };
+        ChatFormatting[] title = { ChatFormatting.DARK_GRAY, ChatFormatting.UNDERLINE };
+
+        String range = this.isRangeDefault() ? "<default>" : "%.1f block(s)".formatted(this.range);
+
+        LinkedList<Component> message = new LinkedList<>(List.of(
+                Component.literal("-- Radio Block Data at [%s]:\n".formatted(blockPos.toShortString())).withStyle(title),
+
+                Component.literal("UUID:  %s\n".formatted(this.id)).withStyle(body),
+                Component.literal("Name:  '%s'\n".formatted(this.stationName)).withStyle(body),
+                Component.literal("URL:  '%s'\n".formatted(this.url)).withStyle(body),
+                Component.literal("Range:  %s\n".formatted(range)).withStyle(body),
+                Component.literal("On?  %s\n\n".formatted(this.isOn())).withStyle(body)
+        ));
+
+        Optional<RadioStream> optStream = RadioManager.getInstance().getRadioStream(this);
+
+        message.add(Component.literal("-- Radio Stream Data:\n").withStyle(title));
+
+        if(optStream.isPresent()) {
+            RadioStream stream = optStream.get();
+            message.addAll(List.of(
+                    Component.literal("Channel Id:  %s\n".formatted(stream.getLastKnownChannelId())).withStyle(body),
+                    Component.literal("State:  '%s'\n".formatted(stream.getState())).withStyle(body),
+                    Component.literal("Range:  %s".formatted(stream.getOutputChannelRange())).withStyle(body)
+            ));
+        } else {
+            message.add(Component.literal("...no radio stream found...").withStyle(body));
+        }
+
+        return message;
     }
 
 
