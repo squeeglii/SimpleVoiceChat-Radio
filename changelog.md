@@ -1,5 +1,8 @@
-**Changelog v2.0**
+**Changelog v2.1**
 
-- Rewrote block saving / loading
-- General stability improvements (I hope the radios actually keep playing now)
-- Added debug command
+- Updated to 1.21.10
+- Added /radio change - a command for changing the sound radius of the radio
+  - Available as:
+    - `/radio change held_item radius <new radius>`
+    - `/radio change block <block_pos> radius <new radius>`
+  - Works on both active & inactive radios.

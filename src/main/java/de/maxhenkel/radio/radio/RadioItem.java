@@ -11,12 +11,14 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.ItemLore;
 import net.minecraft.world.item.component.ResolvableProfile;
 import net.minecraft.world.item.component.TooltipDisplay;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public class RadioItem {
@@ -58,5 +60,20 @@ public class RadioItem {
         item.set(DataComponents.TOOLTIP_DISPLAY, new TooltipDisplay(false, ReferenceSortedSets.singleton(DataComponents.PROFILE)));
 
         return item;
+    }
+
+    public static Optional<RadioData> readRadioData(ItemStack item) {
+        if(item == null) return Optional.empty();
+        if(!item.has(DataComponents.CUSTOM_DATA)) return Optional.empty();
+
+        CustomData data = item.get(DataComponents.CUSTOM_DATA);
+
+        if(data == null) return Optional.empty(); // shouldn't be but hey, sanity.
+
+        return RadioItem.readRadioData(data);
+    }
+
+    public static Optional<RadioData> readRadioData(CustomData data) {
+        return data.copyTag().read(RadioData.NBT_CATEGORY, RadioData.CODEC);
     }
 }

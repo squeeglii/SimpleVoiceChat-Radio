@@ -1,6 +1,7 @@
 package de.maxhenkel.radio.mixin;
 
 import de.maxhenkel.radio.radio.RadioData;
+import de.maxhenkel.radio.radio.RadioItem;
 import de.maxhenkel.radio.radio.RadioManager;
 import de.maxhenkel.radio.utils.IPossibleRadioBlock;
 import net.minecraft.core.BlockPos;
@@ -64,11 +65,11 @@ public class SkullBlockEntityMixin extends BlockEntity implements IPossibleRadio
         if(data == null)
             return;
 
-        Optional<RadioData> wiretapDevice = data.copyTag().read(RadioData.NBT_CATEGORY, RadioData.CODEC);
-        if(wiretapDevice.isEmpty())
+        Optional<RadioData> radioDevice = RadioItem.readRadioData(data);
+        if(radioDevice.isEmpty())
             return;
 
-        this.data = wiretapDevice.get();
+        this.data = radioDevice.get();
 
         // data is non-null by this point - no need to check.
         if(this.level != null && !this.level.isClientSide()) {

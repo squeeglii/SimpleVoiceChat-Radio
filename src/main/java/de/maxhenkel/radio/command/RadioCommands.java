@@ -10,6 +10,7 @@ import com.mojang.logging.LogUtils;
 import de.maxhenkel.radio.Radio;
 import de.maxhenkel.radio.radio.RadioData;
 import de.maxhenkel.radio.radio.RadioItem;
+import de.maxhenkel.radio.radio.RadioManager;
 import de.maxhenkel.radio.utils.IPossibleRadioBlock;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandBuildContext;
@@ -21,8 +22,11 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import org.slf4j.Logger;
+
+import java.util.Optional;
 
 public class RadioCommands {
 
@@ -53,6 +57,28 @@ public class RadioCommands {
                                         Commands.argument("location", BlockPosArgument.blockPos())
                                                 .executes(RadioCommands::runDebugCommand)
                                 )
+                );
+
+        literalBuilder
+                .then(Commands.literal("change")
+                        .then(Commands.literal("held_item")
+                                .then(Commands.literal("radius")
+                                        .then(
+                                                Commands.argument("sound_radius", FloatArgumentType.floatArg(0.0f))
+                                                        .executes(RadioCommands::runChangeItemRadius)
+                                        )
+                                )
+                        )
+                        .then(Commands.literal("block")
+                                .then(Commands.argument("location", BlockPosArgument.blockPos())
+                                        .then(Commands.literal("radius")
+                                                .then(
+                                                        Commands.argument("sound_radius", FloatArgumentType.floatArg(0.0f))
+                                                                .executes(RadioCommands::runChangeBlockRadius)
+                                                )
+                                        )
+                                )
+                        )
                 );
 
         dispatcher.register(literalBuilder);
@@ -108,6 +134,66 @@ public class RadioCommands {
             return 1;
         } else {
             context.getSource().sendFailure(Component.literal("Block at [%s] is not a radio.".formatted(blockPos.toShortString())));
+            return 0;
+        }
+    }
+
+    private static int runChangeItemRadius(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        float soundRadius = FloatArgumentType.getFloat(context, "sound_radius");
+        ServerPlayer player = context.getSource().getPlayerOrException();
+
+        ItemStack heldItem = player.getItemInHand(InteractionHand.MAIN_HAND);
+        Optional<RadioData> optRadioData = RadioItem.readRadioData(heldItem);
+
+        try {
+            if (optRadioData.isPresent()) {
+                RadioData data = optRadioData.get();
+
+                data.setRange(soundRadius);
+                data.serialiseIntoItemStack(heldItem); // replacing the data.
+
+                context.getSource().sendSuccess(() -> Component.literal("Changed radio sound radius to %.1f block(s)".formatted(soundRadius)), false);
+                return 1;
+
+            } else {
+                context.getSource().sendFailure(Component.literal("There is no radio in your main hand."));
+                return 0;
+            }
+
+        } catch (Exception ex) {
+            player.sendSystemMessage(Component.literal("There was an error while editing your radio.").withStyle(ChatFormatting.RED));
+            LogUtils.getLogger().error(ex.getMessage(), ex);
+            return 0;
+        }
+    }
+
+    private static int runChangeBlockRadius(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        BlockPos blockPos = BlockPosArgument.getBlockPos(context, "location");
+        float soundRadius = FloatArgumentType.getFloat(context, "sound_radius");
+        ServerPlayer player = context.getSource().getPlayerOrException();
+        ServerLevel level = context.getSource().getLevel();
+
+        BlockEntity blockEntity = level.getBlockEntity(blockPos);
+
+        try {
+            if(blockEntity instanceof IPossibleRadioBlock radioBlock && radioBlock.radio$isRadio()) {
+                RadioData data = radioBlock.radio$getRadioData();
+
+                data.setRange(soundRadius);
+                RadioManager.getInstance().updateRadioStream(data, level, blockEntity);
+                blockEntity.setChanged(); // ensure the volume change is saved.
+
+                context.getSource().sendSuccess(() -> Component.literal("Changed radio sound radius to %.1f block(s)".formatted(soundRadius)), false);
+                return 1;
+
+            } else {
+                context.getSource().sendFailure(Component.literal("There is no radio at that location."));
+                return 0;
+            }
+
+        } catch (Exception ex) {
+            player.sendSystemMessage(Component.literal("There was an error while editing your radio.").withStyle(ChatFormatting.RED));
+            LogUtils.getLogger().error(ex.getMessage(), ex);
             return 0;
         }
     }

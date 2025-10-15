@@ -54,8 +54,13 @@ public class RadioManager {
         }
     }
 
-    /** @return true if the data of the RadioData has been changed. */
-    public boolean updateRadioStream(RadioData radioData, ServerLevel serverLevel, SkullBlockEntity skullBlockEntity) {
+    /**
+     * Opens a new audio stream for the provided radio data.
+     * If any previous stream existed with the same id, it is deleted.
+     * This can be used to refresh the properties of the stream if they are updated while a stream is already playing.
+     * @return true if this method has modified the contents of the RadioData parameter.
+     */
+    public boolean updateRadioStream(RadioData radioData, ServerLevel serverLevel, BlockEntity skullBlockEntity) {
         boolean idChanged = radioData.assignIdIfNil();
 
         RadioStream radioStream = new RadioStream(radioData, serverLevel, skullBlockEntity.getBlockPos());
