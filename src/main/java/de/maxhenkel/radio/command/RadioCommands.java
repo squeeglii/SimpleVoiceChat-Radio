@@ -6,6 +6,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.logging.LogUtils;
 import de.maxhenkel.radio.Radio;
 import de.maxhenkel.radio.radio.RadioData;
 import de.maxhenkel.radio.radio.RadioItem;
@@ -21,6 +22,7 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import org.slf4j.Logger;
 
 public class RadioCommands {
 
@@ -82,6 +84,7 @@ public class RadioCommands {
             return 1;
         } catch (Exception ex) {
             player.sendSystemMessage(Component.literal("There was an error while providing you with a radio.").withStyle(ChatFormatting.RED));
+            LogUtils.getLogger().error(ex.getMessage(), ex);
             return 0;
         }
     }

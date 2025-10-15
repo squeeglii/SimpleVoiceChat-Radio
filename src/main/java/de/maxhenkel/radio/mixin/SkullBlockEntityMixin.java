@@ -35,27 +35,16 @@ public class SkullBlockEntityMixin extends BlockEntity implements IPossibleRadio
         super(blockEntityType, blockPos, blockState);
     }
 
-    @Inject(method = "setOwner", at = @At("RETURN"))
-    public void setOwner(ResolvableProfile resolvableProfile, CallbackInfo ci) {
-        if (level != null && !level.isClientSide) {
-            this.data = RadioManager.getInstance().loadHeadFromGameProfile((SkullBlockEntity) (Object) this).orElse(null);
-
-            if(this.data == null) return;
-
-            RadioManager.getInstance().updateRadioStream(this.data, (ServerLevel) this.level, (SkullBlockEntity) (Object) this);
-        }
-    }
-
     // block saving / loading
     @Inject(method = "loadAdditional", at = @At("RETURN"))
     public void load(ValueInput valueInput, CallbackInfo ci) {
         this.data = valueInput.read(RadioData.NBT_CATEGORY, RadioData.CODEC).orElse(null);
 
-        if (this.data == null && this.level != null && !this.level.isClientSide) {
+        if (this.data == null && this.level != null && !this.level.isClientSide()) {
             this.data = RadioManager.getInstance().loadHeadFromGameProfile((SkullBlockEntity) (Object) this).orElse(null);
         }
 
-        if(this.data != null && this.level != null && !this.level.isClientSide) {
+        if(this.data != null && this.level != null && !this.level.isClientSide()) {
             RadioManager.getInstance().updateRadioStream(this.data, (ServerLevel) this.level, (SkullBlockEntity) (Object) this);
         }
     }
@@ -82,7 +71,7 @@ public class SkullBlockEntityMixin extends BlockEntity implements IPossibleRadio
         this.data = wiretapDevice.get();
 
         // data is non-null by this point - no need to check.
-        if(this.level != null && !this.level.isClientSide) {
+        if(this.level != null && !this.level.isClientSide()) {
             RadioManager.getInstance().updateRadioStream(this.data, (ServerLevel) this.level, (SkullBlockEntity) (Object) this);
         }
     }
@@ -100,7 +89,7 @@ public class SkullBlockEntityMixin extends BlockEntity implements IPossibleRadio
         Level oldLevel = level;
         super.setLevel(newLevel);
 
-        if (oldLevel == null && newLevel != null && !newLevel.isClientSide) {
+        if (oldLevel == null && newLevel != null && !newLevel.isClientSide()) {
             if(this.data == null)
                 this.data = RadioManager.getInstance().loadHeadFromGameProfile((SkullBlockEntity) (Object) this).orElse(null);
 

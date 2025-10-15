@@ -25,6 +25,8 @@ public class RadioManager {
         this.radioStreams = new HashMap<>();
     }
 
+    // This may be broken entirely as of 1.21.10.
+    // Not fixing this.
     @Deprecated(since = "2.0")
     public Optional<RadioData> loadHeadFromGameProfile(SkullBlockEntity skullBlockEntity) {
         if (!(skullBlockEntity.getLevel() instanceof ServerLevel serverLevel))
@@ -36,10 +38,10 @@ public class RadioManager {
         // todo: Deprecate storing data in player heads -- CustomData works perfectly fine.
         //       The playerhead loading will remain in place, but new data will be saved
         //       to CustomData instead of the GameProfile
-        //       -- v
+        //
 
         try {
-            GameProfile ownerProfile = resolvableProfile.gameProfile();
+            GameProfile ownerProfile = resolvableProfile.partialProfile();
             RadioData radioData = RadioData.fromGameProfile(ownerProfile);
             if (radioData == null) return Optional.empty();
 

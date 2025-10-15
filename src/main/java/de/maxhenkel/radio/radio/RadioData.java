@@ -203,10 +203,10 @@ public class RadioData {
         radioData.on = Boolean.parseBoolean(getValue(gameProfile, ON_TAG));
         radioData.range = getFloatValueOrElse(gameProfile, RANGE_TAG, -1.0f);
 
-        gameProfile.getProperties().removeAll(STREAM_URL_TAG);
-        gameProfile.getProperties().removeAll(STATION_NAME_TAG);
-        gameProfile.getProperties().removeAll(ON_TAG);
-        gameProfile.getProperties().removeAll(RANGE_TAG);
+        gameProfile.properties().removeAll(STREAM_URL_TAG);
+        gameProfile.properties().removeAll(STATION_NAME_TAG);
+        gameProfile.properties().removeAll(ON_TAG);
+        gameProfile.properties().removeAll(RANGE_TAG);
 
         return radioData;
     }
@@ -214,8 +214,9 @@ public class RadioData {
     @Deprecated(since = "2.0")
     @Nullable
     private static String getValue(GameProfile gameProfile, String key) {
-        return gameProfile.getProperties().get(key)
+        return gameProfile.properties().get(key)
                 .stream()
+                .filter(Objects::nonNull)
                 .map(Property::value)
                 .findFirst()
                 .orElse(null);
@@ -239,7 +240,7 @@ public class RadioData {
         if (profile == null) {
             return false;
         }
-        return profile.getId().equals(RADIO_ID);
+        return profile.id().equals(RADIO_ID);
     }
 
     public static RadioData createAnonymousRadioData(String url, String stationName, boolean on, float range) {

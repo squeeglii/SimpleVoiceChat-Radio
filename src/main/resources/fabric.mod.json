@@ -5,7 +5,8 @@
   "name": "Simple Voice Chat Radio",
   "description": "Simple Voice Chat Radio",
   "authors": [
-    "Max Henkel"
+    "Max Henkel",
+    "CG360"
   ],
   "contact": {
     "website": "https://modrepo.de"
@@ -26,7 +27,7 @@
   "depends": {
     "fabricloader": ">=${loader_version}",
     "minecraft": ">=${minecraft_dependency}",
-    "java": ">=17",
+    "java": ">=21",
     "voicechat": ">=${minecraft_version}-${voicechat_api_version}"
   },
   "breaks": {
