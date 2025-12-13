@@ -22,6 +22,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.Permission;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -32,7 +33,13 @@ public class RadioCommands {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext ctx, Commands.CommandSelection environment) {
         LiteralArgumentBuilder<CommandSourceStack> literalBuilder = Commands.literal("radio")
-                .requires((commandSource) -> commandSource.hasPermission(Radio.SERVER_CONFIG.commandPermissionLevel.get()));
+                .requires(source -> {
+                    Optional<Permission> optMinPermissionLevel = Radio.SERVER_CONFIG.getMinimumPermission();
+
+                    return optMinPermissionLevel.isPresent()
+                            ? source.permissions().hasPermission(optMinPermissionLevel.get())
+                            : true; // level == 0, always accept.
+                } );
 
         literalBuilder
                 .then(

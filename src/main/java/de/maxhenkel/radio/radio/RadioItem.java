@@ -5,7 +5,7 @@ import de.maxhenkel.radio.Radio;
 import de.maxhenkel.radio.utils.HeadUtils;
 import it.unimi.dsi.fastutil.objects.ReferenceSortedSets;
 import net.minecraft.ChatFormatting;
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;

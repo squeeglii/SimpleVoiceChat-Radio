@@ -2,6 +2,11 @@ package de.maxhenkel.radio.config;
 
 import de.maxhenkel.configbuilder.ConfigBuilder;
 import de.maxhenkel.configbuilder.ConfigEntry;
+import de.maxhenkel.radio.Radio;
+import net.minecraft.server.permissions.Permission;
+import net.minecraft.server.permissions.Permissions;
+
+import java.util.Optional;
 
 public class ServerConfig {
 
@@ -43,6 +48,26 @@ public class ServerConfig {
                 Long.MAX_VALUE,
                 "The frequency of the music particles in milliseconds"
         );
+    }
+
+    // 0 (none) --> 4 (owner)
+    public Optional<Permission> getMinimumPermission() {
+        int level = this.commandPermissionLevel.get();
+
+        return Optional.ofNullable(switch (level) {
+            case 0 -> null;
+            case 1 -> Permissions.COMMANDS_MODERATOR;
+            case 2 -> Permissions.COMMANDS_GAMEMASTER;
+            case 3 -> Permissions.COMMANDS_ADMIN;
+            case 4 -> Permissions.COMMANDS_OWNER;
+
+            // todo: add a way to block using the command entirely
+
+            default -> {
+                Radio.LOGGER.warn("Minimum permission level incorrectly configured for svc-radio command! Must be between 0-4");
+                yield  Permissions.COMMANDS_GAMEMASTER;
+            }
+        });
     }
 
 }
