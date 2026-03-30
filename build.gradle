@@ -1,19 +1,25 @@
 plugins {
-    id 'fabric-loom' version '1.13-SNAPSHOT'
-    id 'com.matthewprenger.cursegradle' version '1.4.0'
-    id 'com.github.johnrengelman.shadow' version '8.1.1'
-    id 'com.modrinth.minotaur' version '2.+'
-    id 'mod-update' version '2.0.0'
+    id("java")
+    id('net.fabricmc.fabric-loom') version '1.15-SNAPSHOT'
+    
+    id("com.gradleup.shadow") version "9.4.0" apply false
+    
+    id("com.modrinth.minotaur") version "2.+" apply false
+    id("net.darkhax.curseforgegradle") version "1.1.18" apply false
 }
 
-sourceCompatibility = JavaVersion.VERSION_21
-targetCompatibility = JavaVersion.VERSION_21
+import net.darkhax.curseforgegradle.TaskPublishCurseForge
+
+apply plugin: "java"
+apply plugin: "com.gradleup.shadow"
+apply plugin: "com.modrinth.minotaur"
+apply from: "$rootDir/publishing.gradle"
 
 String mod_version = "%s+%s".formatted(mod_base_version, mod_version_meta);
 
-archivesBaseName = archives_base_name
-version = mod_version
+base.archivesName = archives_base_name
 group = maven_group
+version = mod_version
 
 repositories {
     mavenLocal()
@@ -49,9 +55,9 @@ runClient.doFirst {
 }
 
 dependencies {
-    minecraft "com.mojang:minecraft:${minecraft_version}"
-    mappings loom.officialMojangMappings()
-    modImplementation "net.fabricmc:fabric-loader:${loader_version}"
+    minecraft "com.mojang:minecraft:${minecraft_dependency}"
+
+    implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
 
     Set<String> apiModules = [
             'fabric-api-base',
@@ -60,7 +66,7 @@ dependencies {
     ]
 
     apiModules.forEach {
-        include(modImplementation(fabricApi.module(it, fabric_version)))
+        include(implementation(fabricApi.module(it, fabric_api_version)))
     }
 
     implementation 'com.google.code.findbugs:jsr305:3.0.2'
@@ -70,8 +76,8 @@ dependencies {
 
     implementation "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}"
 
-    modRuntimeOnly "maven.modrinth:simple-voice-chat:fabric-${voicechat_mod_version}"
-    modRuntimeOnly "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+    runtimeOnly "maven.modrinth:simple-voice-chat:fabric-${voicechat_mod_version}"
+    runtimeOnly "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
 
     implementation "javazoom:jlayer:${jlayer_version}"
     shadow "javazoom:jlayer:${jlayer_version}"
@@ -90,7 +96,7 @@ processResources {
 
 tasks.withType(JavaCompile).configureEach {
     it.options.encoding = 'UTF-8'
-    it.options.release = 21
+    it.options.release = 25
 }
 
 java {
@@ -103,29 +109,38 @@ jar {
     }
 }
 
-curseforge {
-    apiKey = file('curseforge_api_key.txt').exists() ? file('curseforge_api_key.txt').text : ''
-    project {
-        id = curse_id
-        changelogType = 'markdown'
-        changelog = file('changelog.md')
-        releaseType = release_type
-        addGameVersion curseforge_minecraft_version
-        addGameVersion 'Fabric'
-        addGameVersion 'Java 21'
-        mainArtifact(file("${buildDir}/libs/${archivesBaseName}-${version}.jar")) {
-            displayName = "[FABRIC][${minecraft_version}] ${mod_name} ${mod_base_version}"
-            relations {
-                requiredDependency 'simple-voice-chat'
-            }
-        }
-        afterEvaluate {
-            uploadTask.dependsOn(remapJar)
-        }
-    }
-    options {
-        forgeGradleIntegration = false
-    }
+
+tasks.register('curseforge', TaskPublishCurseForge) {
+    group = "upload"
+    description = "Publishes project to CurseForge"
+
+    String mcVer = project.properties["minecraft_dependency"]
+    String projectVer = project.properties["mod_version"]
+    String projectId = project.properties["curseforge_project"]
+
+    if(projectVer == null || projectVer.isBlank())
+        throw new IllegalStateException("Project version should not be null when publishing.")
+
+    apiToken = getCurseToken(project)
+
+    var shouldPublish = project.properties["debug_publishing"]
+    if(shouldPublish != null && shouldPublish.toString().equalsIgnoreCase("true"))
+        debugMode = true
+
+    def mainFile = upload(projectId, shadowJar)
+    mainFile.displayName = "[FABRIC][${minecraft_dependency}] ${mod_title} ${mod_base_version}"
+    mainFile.addModLoader("fabric")
+    mainFile.addModLoader("quilt")
+    mainFile.releaseType = project.properties["release_type"]
+
+    mainFile.changelogType = "markdown"
+    mainFile.changelog = new File(project.getRootDir(), "changelog.md")
+
+    for(String version: getSupportedVersions(project.properties))
+        mainFile.addGameVersion(version)
+
+    mainFile.addRequirement("simple-voice-chat")
+
 }
 
 tasks.modrinth.configure({
@@ -136,41 +151,33 @@ tasks.modrinthSyncBody.configure({
 })
 
 modrinth {
-    token = file("${rootDir}/modrinth_token.txt").exists() ? file("${rootDir}/modrinth_token.txt").text : ''
+    String[] versions = getSupportedVersions(project.properties);
+
+    token = getModrinthToken(project)
     projectId = modrinth_id
+    versionName = "[FABRIC][${minecraft_dependency}] ${mod_title} ${mod_base_version}"
     versionNumber = "${mod_version}"
-    versionName = "[FABRIC][${minecraft_version}] ${mod_name} ${mod_base_version}"
-    uploadFile = remapJar
     versionType = release_type.toUpperCase()
-    changelog = file('changelog.md').text
-    gameVersions = [minecraft_version]
+    uploadFile = shadowJar
+    gameVersions = Arrays.asList(versions)
     loaders = ['fabric', 'quilt']
+
     syncBodyFrom = file('readme.md').text
+    changelog = new File(project.getRootDir(), "changelog.md").readLines().join("\n")
+
+    var shouldPublish = project.properties["debug_publishing"]
+    if(shouldPublish != null && shouldPublish.toString().equalsIgnoreCase("true"))
+        setDebugMode(true)
+
     dependencies {
         required.project '9eGKb6K1' // Simple Voice Chat
     }
 }
 tasks.modrinth.dependsOn(build)
 
-modUpdate {
-    serverURL = 'https://update.maxhenkel.de/'
-    modID = mod_id
-    gameVersion = minecraft_version
-    modLoader = 'fabric'
-    modVersion = mod_version
-    changelogFile = file('changelog.md')
-    releaseType = release_type
-    tags = recommended == 'true' ? ['recommended'] : []
-}
-
 shadowJar {
     configurations = [project.configurations.shadow]
-    archiveClassifier = 'shadow-dev'
+    archiveClassifier = 'release'
     relocate 'de.maxhenkel.configbuilder', "de.maxhenkel.${mod_id}.configbuilder"
     relocate 'javazoom', "de.maxhenkel.${mod_id}.javazoom"
-}
-
-remapJar {
-    dependsOn shadowJar
-    inputFile = shadowJar.archiveFile.get()
 }

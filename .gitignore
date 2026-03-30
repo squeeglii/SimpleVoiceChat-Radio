@@ -117,7 +117,12 @@ run/
 # Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
 !gradle-wrapper.jar
 
+# Don't include any and all forms of credentials - this should probably be an
+# env variable anyway.
 curseforge_api_key.txt
+curse_creds.txt
 mod_update_api_key.txt
 modrinth_token.txt
+modrinth_creds.txt
+
 libs/

@@ -141,7 +141,7 @@ public class RadioManager {
     private static boolean isInChunk(BlockPos pos, ChunkPos chunkPos) {
         int chunkX = SectionPos.blockToSectionCoord(pos.getX());
         int chunkZ = SectionPos.blockToSectionCoord(pos.getZ());
-        return chunkX == chunkPos.x && chunkZ == chunkPos.z;
+        return chunkX == chunkPos.x() && chunkZ == chunkPos.z();
     }
 
     public void clear() {

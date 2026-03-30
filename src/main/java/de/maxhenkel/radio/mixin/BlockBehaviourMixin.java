@@ -48,7 +48,7 @@ public class BlockBehaviourMixin {
         String displayState = data.isOn() ? "on" : "off";
 
         level.playSound(null, blockPos, SoundEvents.LEVER_CLICK, SoundSource.BLOCKS, 1F, 1F);
-        player.displayClientMessage(Component.literal("Toggled radio %s.".formatted(displayState)), false);
+        player.sendOverlayMessage(Component.literal("Toggled radio %s.".formatted(displayState)));
 
         cir.setReturnValue(InteractionResult.CONSUME);    // I forget why I changed this but I'm fairly sure it was a bug fix.
         cir.cancel();
