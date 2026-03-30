@@ -1,8 +1,7 @@
-**Changelog v2.1**
+**Changelog v2.2**
 
 - Updated to 26.1
-- Added /radio change - a command for changing the sound radius of the radio
-  - Available as:
-    - `/radio change held_item radius <new radius>`
-    - `/radio change block <block_pos> radius <new radius>`
-  - Works on both active & inactive radios.
+- Pick-Block on a radio skull now always gives you the radio with data
+  - Previously, you would be given a plain playerhead
+- Added restone control! Radios are now toggled by a redstone impulse (like the copper bulb)
+- Disabled legacy head loading

@@ -2,7 +2,6 @@ package de.maxhenkel.radio.radio;
 
 import de.maxhenkel.radio.Radio;
 import de.maxhenkel.radio.RadioVoicechatPlugin;
-import de.maxhenkel.radio.utils.HeadUtils;
 import de.maxhenkel.radio.utils.RadioStreamState;
 import de.maxhenkel.voicechat.api.Position;
 import de.maxhenkel.voicechat.api.VoicechatServerApi;
@@ -37,6 +36,8 @@ public class RadioStream implements Supplier<short[]> {
 
     private UUID lastKnownChannelId;
     private RadioStreamState state;
+
+    private long lastValidityCheck;
 
     @Nullable
     private LocationalAudioChannel channel;
@@ -261,18 +262,18 @@ public class RadioStream implements Supplier<short[]> {
         });
     }
 
-    private long lastCheck;
-
     private void checkValid() {
         long time = System.currentTimeMillis();
-        if (time - lastCheck < 30000L) {
+        if (time - this.lastValidityCheck < 30000L) {
             return;
         }
-        lastCheck = time;
-        serverLevel.getServer().execute(() -> {
-            if (!RadioManager.isValidRadioLocation(id, position, serverLevel)) {
-                RadioManager.getInstance().stopStream(id);
-                Radio.LOGGER.warn("Stopped radio stream {} as it doesn't exist anymore", id);
+
+        this.lastValidityCheck = time;
+
+        this.serverLevel.getServer().execute(() -> {
+            if (!RadioManager.isValidRadioLocation(this.id, this.position, this.serverLevel)) {
+                RadioManager.getInstance().stopStream(this.id);
+                Radio.LOGGER.warn("Stopped radio stream {} as it doesn't exist anymore", this.id);
             }
         });
     }

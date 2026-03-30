@@ -115,8 +115,8 @@ tasks.register('curseforge', TaskPublishCurseForge) {
     description = "Publishes project to CurseForge"
 
     String mcVer = project.properties["minecraft_dependency"]
-    String projectVer = project.properties["mod_version"]
-    String projectId = project.properties["curseforge_project"]
+    String projectVer = project.properties["mod_base_version"]
+    String projectId = project.properties["curse_id"]
 
     if(projectVer == null || projectVer.isBlank())
         throw new IllegalStateException("Project version should not be null when publishing.")
@@ -128,9 +128,9 @@ tasks.register('curseforge', TaskPublishCurseForge) {
         debugMode = true
 
     def mainFile = upload(projectId, shadowJar)
-    mainFile.displayName = "[FABRIC][${minecraft_dependency}] ${mod_title} ${mod_base_version}"
-    mainFile.addModLoader("fabric")
-    mainFile.addModLoader("quilt")
+    mainFile.displayName = "[FABRIC][${mcVer}] ${mod_title} v${projectVer}"
+    mainFile.addModLoader("Fabric")
+    mainFile.addModLoader("Quilt")
     mainFile.releaseType = project.properties["release_type"]
 
     mainFile.changelogType = "markdown"
@@ -155,7 +155,7 @@ modrinth {
 
     token = getModrinthToken(project)
     projectId = modrinth_id
-    versionName = "[FABRIC][${minecraft_dependency}] ${mod_title} ${mod_base_version}"
+    versionName = "[FABRIC][${minecraft_dependency}] ${mod_title} v${mod_base_version}"
     versionNumber = "${mod_version}"
     versionType = release_type.toUpperCase()
     uploadFile = shadowJar
@@ -177,7 +177,7 @@ tasks.modrinth.dependsOn(build)
 
 shadowJar {
     configurations = [project.configurations.shadow]
-    archiveClassifier = 'release'
+    archiveClassifier = ''
     relocate 'de.maxhenkel.configbuilder', "de.maxhenkel.${mod_id}.configbuilder"
     relocate 'javazoom', "de.maxhenkel.${mod_id}.javazoom"
 }

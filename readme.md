@@ -13,13 +13,13 @@ The mp3 stream must be playable by [JLayer](https://web.archive.org/web/20210108
 - Install this mod alongside [Simple Voice Chat](https://modrinth.com/plugin/simple-voice-chat) on your server
 - Make sure you set up the voice chat mod correctly (see [here](https://modrepo.de/minecraft/voicechat/wiki/server_setup))
 - Get the mp3 livestream URL of your favorite radio station
-- Enter the command `/radio create "<stream-url" "<station-name>"` to create a radio block
+- Enter the command `/radio create "<stream-url>" "<station-name>"` to create a radio block
 - Place the radio block
 - Right-click the radio block to turn it on
 
 ## Commands
 
-- `/radio create "<stream-url" "<station-name>" [sound_radius]` - Gives you a radio playing the provided mp3 stream. If the
+- `/radio create "<stream-url>" "<station-name>" [sound_radius]` - Gives you a radio playing the provided mp3 stream. If the
 radius isn't provided, the server default (48, in the config) is used.
 
 ## How to get Radio Stream URLs
