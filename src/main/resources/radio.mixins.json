@@ -6,7 +6,8 @@
   "mixins": [
     "SkullBlockEntityMixin",
     "BlockMixin",
-    "BlockBehaviourMixin"
+    "BlockBehaviourMixin",
+    "EnhancedPickBlockMixin"
   ],
   "injectors": {
     "defaultRequire": 1
