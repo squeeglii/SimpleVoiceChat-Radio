@@ -40,10 +40,6 @@ public class SkullBlockEntityMixin extends BlockEntity implements IPossibleRadio
     public void load(ValueInput valueInput, CallbackInfo ci) {
         this.data = valueInput.read(RadioData.NBT_CATEGORY, RadioData.CODEC).orElse(null);
 
-        if (this.data == null && this.level != null && !this.level.isClientSide()) {
-            this.data = RadioManager.getInstance().loadHeadFromGameProfile((SkullBlockEntity) (Object) this).orElse(null);
-        }
-
         if(this.data != null && this.level != null && !this.level.isClientSide()) {
             RadioManager.getInstance().updateRadioStream(this.data, (ServerLevel) this.level, (SkullBlockEntity) (Object) this);
         }
@@ -90,9 +86,6 @@ public class SkullBlockEntityMixin extends BlockEntity implements IPossibleRadio
         super.setLevel(newLevel);
 
         if (oldLevel == null && newLevel != null && !newLevel.isClientSide()) {
-            if(this.data == null)
-                this.data = RadioManager.getInstance().loadHeadFromGameProfile((SkullBlockEntity) (Object) this).orElse(null);
-
             if(this.data != null)
                 RadioManager.getInstance().updateRadioStream(this.data, (ServerLevel) newLevel, (SkullBlockEntity) (Object) this);
         }
