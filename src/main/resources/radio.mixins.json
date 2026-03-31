@@ -4,10 +4,11 @@
   "package": "de.maxhenkel.radio.mixin",
   "compatibilityLevel": "JAVA_22",
   "mixins": [
-    "SkullBlockEntityMixin",
-    "BlockMixin",
     "BlockBehaviourMixin",
+    "BlockMixin",
     "EnhancedPickBlockMixin",
+    "PreserveBlockEntityCustomDataMixin",
+    "SkullBlockEntityMixin",
     "SkullBlockMixin"
   ],
   "injectors": {

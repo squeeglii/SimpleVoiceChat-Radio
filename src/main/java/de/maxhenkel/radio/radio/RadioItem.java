@@ -1,19 +1,16 @@
 package de.maxhenkel.radio.radio;
 
-import com.mojang.authlib.GameProfile;
 import de.maxhenkel.radio.Radio;
 import de.maxhenkel.radio.utils.HeadUtils;
 import it.unimi.dsi.fastutil.objects.ReferenceSortedSets;
 import net.minecraft.ChatFormatting;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.Util;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.ItemLore;
-import net.minecraft.world.item.component.ResolvableProfile;
 import net.minecraft.world.item.component.TooltipDisplay;
 
 import java.util.LinkedList;
@@ -75,5 +72,9 @@ public class RadioItem {
 
     public static Optional<RadioData> readRadioData(CustomData data) {
         return data.copyTag().read(RadioData.NBT_CATEGORY, RadioData.CODEC);
+    }
+
+    public static void scrubRadioInCustomData(CompoundTag tag) {
+        tag.remove(RadioData.NBT_CATEGORY);
     }
 }
