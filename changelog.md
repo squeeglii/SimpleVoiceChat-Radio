@@ -1,4 +1,10 @@
-**Changelog v2.2**
+**Changelog v2.2.1:**
+
+- Fixed issue where customdata (nbt) would be cleared on all heads
+- Multiple radios of the same station can now play together (needs a re-place)
+
+
+**Changelog v2.2:**
 
 - Updated to 26.1
 - Pick-Block on a radio skull now always gives you the radio with data
