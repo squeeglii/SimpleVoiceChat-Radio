@@ -53,6 +53,7 @@ public class SkullBlockEntityMixin extends BlockEntity implements IPossibleRadio
     }
 
     // item conversion ---
+    // this takes from item
     @Inject(method = "applyImplicitComponents(Lnet/minecraft/core/component/DataComponentGetter;)V", at = @At("RETURN"))
     protected void applyExtraComponents(DataComponentGetter dataComponentGetter, CallbackInfo ci) {
         // Mark both types as checked so they get removed from the held components.
@@ -65,6 +66,7 @@ public class SkullBlockEntityMixin extends BlockEntity implements IPossibleRadio
             return;
 
         this.data = radioDevice.get();
+        this.data.rerollId(); // because of how I've done pickblock, just assume a new id is needed on place.
 
         // data is non-null by this point - no need to check.
         if(this.level != null && !this.level.isClientSide()) {
@@ -72,6 +74,7 @@ public class SkullBlockEntityMixin extends BlockEntity implements IPossibleRadio
         }
     }
 
+    // This saves to item.
     @Inject(method = "collectImplicitComponents(Lnet/minecraft/core/component/DataComponentMap$Builder;)V", at = @At("RETURN"))
     protected void collectExtraComponents(DataComponentMap.Builder builder, CallbackInfo ci) {
         if(this.data == null) return;
