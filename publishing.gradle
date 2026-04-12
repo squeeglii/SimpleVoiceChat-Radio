@@ -44,7 +44,7 @@ static String getCurseToken(Project project) {
 }
 
 static String[] getSupportedVersions(Map<String, ?> properties) {
-    return properties.getOrDefault("supported_minecraft_versions", "")
+    return properties.getOrDefault("tested_minecraft_versions", "")
             .toString()
             .split(Pattern.quote(","))
 }
