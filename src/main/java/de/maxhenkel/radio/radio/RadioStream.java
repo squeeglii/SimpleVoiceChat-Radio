@@ -33,10 +33,9 @@ import java.util.function.Supplier;
 
 public class RadioStream implements Supplier<short[]> {
 
-    private static final int BITS_PER_SAMPLE = 16;
     private static final int FRAME_SIZE = 960;
     private static final int AUDIO_FRAMES_PER_SECOND = 50; // 20000000ns -> 0.02s per frame
-    private static final AudioFormat SVC_FORMAT = new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, 48000, BITS_PER_SAMPLE, 1, FRAME_SIZE, AUDIO_FRAMES_PER_SECOND, false); // unsure on endienness
+    private static final AudioFormat SVC_FORMAT = new AudioFormat(48000.0f, 16, 1, true, false);
 
     private final RadioData radioData;
     private final UUID id;
@@ -48,6 +47,8 @@ public class RadioStream implements Supplier<short[]> {
     private AudioPlayer audioPlayer;
     @Nullable
     private AudioInputStream radioStationStream;
+    @Nullable
+    private AudioInputStream decodedRadioStationStream;
     @Nullable
     private AudioInputStream convertedStream;
 
@@ -107,15 +108,18 @@ public class RadioStream implements Supplier<short[]> {
 
         try {
             URI source = new URI(radioData.getUrl());
-
-            AudioFileFormat remoteFormat = AudioSystem.getAudioFileFormat(source.toURL());
             this.radioStationStream = AudioSystem.getAudioInputStream(source.toURL());
-
-
             AudioFormat format = this.radioStationStream.getFormat();
-            this.radioStationStream
 
-            this.convertedStream = AudioSystem.getAudioInputStream(SVC_FORMAT, this.radioStationStream);
+            this.decodedRadioStationStream = AudioSystem.getAudioInputStream(
+                    new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, format.getSampleRate(), format.getSampleSizeInBits(),
+                            format.getChannels(), format.getChannels(), format.getFrameRate(),
+                            format.isBigEndian(), format.properties()),
+                    this.radioStationStream);
+
+
+            this.convertedStream = AudioSystem.getAudioInputStream(SVC_FORMAT, this.decodedRadioStationStream);
+
         } catch (UnsupportedAudioFileException err) {
             Radio.LOGGER.error("Unable to stream radio from url '{}' - unsupported audio format! Try a radio station using 'MP3' or 'HE-ACC'.", radioData.getUrl());
             return;
@@ -147,6 +151,15 @@ public class RadioStream implements Supplier<short[]> {
                 Radio.LOGGER.warn("Failed to close radio station input stream", e);
             }
             this.radioStationStream = null;
+        }
+
+        if (this.decodedRadioStationStream != null) {
+            try {
+                this.decodedRadioStationStream.close();
+            } catch (Exception e) {
+                Radio.LOGGER.warn("Failed to close input decoder stream", e);
+            }
+            this.decodedRadioStationStream = null;
         }
 
         if (this.convertedStream != null) {
