@@ -1,19 +1,13 @@
 plugins {
     id("java")
-    id('net.fabricmc.fabric-loom') version '1.15-SNAPSHOT'
-    
-    id("com.gradleup.shadow") version "9.4.0" apply false
-    
-    id("com.modrinth.minotaur") version "2.+" apply false
-    id("net.darkhax.curseforgegradle") version "1.1.18" apply false
+    id('net.fabricmc.fabric-loom') version '1.17-SNAPSHOT'
+    id("com.gradleup.shadow") version "9.4.0"
 }
 
-import net.darkhax.curseforgegradle.TaskPublishCurseForge
+// Publishing plugins (Minotaur / CurseForge) omitted so ./gradlew build works offline / without portal glitches.
+// Re-add upstream publishing block when you need to upload.
 
 apply plugin: "java"
-apply plugin: "com.gradleup.shadow"
-apply plugin: "com.modrinth.minotaur"
-apply from: "$rootDir/publishing.gradle"
 
 String mod_version = "%s+%s".formatted(mod_base_version, mod_version_meta);
 
@@ -110,70 +104,6 @@ jar {
 }
 
 
-tasks.register('curseforge', TaskPublishCurseForge) {
-    group = "upload"
-    description = "Publishes project to CurseForge"
-
-    String mcVer = project.properties["minecraft_dependency"]
-    String projectVer = project.properties["mod_base_version"]
-    String projectId = project.properties["curse_id"]
-
-    if(projectVer == null || projectVer.isBlank())
-        throw new IllegalStateException("Project version should not be null when publishing.")
-
-    apiToken = getCurseToken(project)
-
-    var shouldPublish = project.properties["debug_publishing"]
-    if(shouldPublish != null && shouldPublish.toString().equalsIgnoreCase("true"))
-        debugMode = true
-
-    def mainFile = upload(projectId, shadowJar)
-    mainFile.displayName = "[FABRIC][${mcVer}] ${mod_title} v${projectVer}"
-    mainFile.addModLoader("Fabric")
-    mainFile.addModLoader("Quilt")
-    mainFile.releaseType = project.properties["release_type"]
-
-    mainFile.changelogType = "markdown"
-    mainFile.changelog = new File(project.getRootDir(), "changelog.md")
-
-    for(String version: getSupportedVersions(project.properties))
-        mainFile.addGameVersion(version)
-
-    mainFile.addRequirement("simple-voice-chat")
-
-}
-
-tasks.modrinth.configure({
-    group = 'upload'
-})
-tasks.modrinthSyncBody.configure({
-    group = 'upload'
-})
-
-modrinth {
-    String[] versions = getSupportedVersions(project.properties);
-
-    token = getModrinthToken(project)
-    projectId = modrinth_id
-    versionName = "[FABRIC][${minecraft_dependency}] ${mod_title} v${mod_base_version}"
-    versionNumber = "${mod_version}"
-    versionType = release_type.toUpperCase()
-    uploadFile = shadowJar
-    gameVersions = Arrays.asList(versions)
-    loaders = ['fabric', 'quilt']
-
-    syncBodyFrom = file('readme.md').text
-    changelog = new File(project.getRootDir(), "changelog.md").readLines().join("\n")
-
-    var shouldPublish = project.properties["debug_publishing"]
-    if(shouldPublish != null && shouldPublish.toString().equalsIgnoreCase("true"))
-        setDebugMode(true)
-
-    dependencies {
-        required.project '9eGKb6K1' // Simple Voice Chat
-    }
-}
-tasks.modrinth.dependsOn(build)
 
 shadowJar {
     configurations = [project.configurations.shadow]

@@ -8,9 +8,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.AbstractSkullBlock;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.SkullBlock;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.block.entity.SkullBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.redstone.Orientation;
 import org.spongepowered.asm.mixin.Mixin;
@@ -32,13 +30,14 @@ public class SkullBlockMixin {
     public void handleRedstoneToggle(BlockState state, Level level, BlockPos pos, Block block, Orientation orientation, boolean movedByPiston, CallbackInfo ci, @Local(name = "signal") boolean isPowered) {
         // @At already checked if signal != block powered state, as well as this being server-side
 
-        level.getBlockEntity(pos, BlockEntityType.SKULL).ifPresent(skull -> {
-            if(isPowered && skull instanceof IPossibleRadioBlock radio && radio.radio$isRadio()) {
-                RadioData radioData = radio.radio$getRadioData();
-                radioData.toggleOn();
-                RadioManager.getInstance().updateHeadOnState(radioData.getId(), radioData.isOn());
-            }
-        });
+        if (level.getBlockEntity(pos) instanceof SkullBlockEntity skull
+                && isPowered
+                && skull instanceof IPossibleRadioBlock radio
+                && radio.radio$isRadio()) {
+            RadioData radioData = radio.radio$getRadioData();
+            radioData.toggleOn();
+            RadioManager.getInstance().updateHeadOnState(radioData.getId(), radioData.isOn());
+        }
     }
 
 

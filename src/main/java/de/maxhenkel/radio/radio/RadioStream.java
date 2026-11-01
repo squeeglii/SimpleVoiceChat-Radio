@@ -255,7 +255,7 @@ public class RadioStream implements Supplier<short[]> {
         lastParticle = time;
         serverLevel.getServer().execute(() -> {
             Vec3 vec3 = Vec3.atBottomCenterOf(position).add(0D, 1D, 0D);
-            serverLevel.players().stream().filter(player -> player.position().distanceTo(position.getCenter()) <= 32D).forEach(player -> {
+            serverLevel.players().stream().filter(player -> player.position().distanceTo(Vec3.atCenterOf(position)) <= 32D).forEach(player -> {
                 float random = (float) serverLevel.getRandom().nextInt(4) / 24F;
                 serverLevel.sendParticles(ParticleTypes.NOTE, vec3.x(), vec3.y(), vec3.z(), 0, random, 0D, 0D, 1D);
             });
