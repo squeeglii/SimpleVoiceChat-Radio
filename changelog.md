@@ -1,3 +1,6 @@
+**Changelog v2.2.2 (26.3 Only):**
+- Ported to 26.3 (Thank you @DarthJahus!)
+
 **Changelog v2.2.1:**
 
 - Fixed issue where customdata (nbt) would be cleared on all heads

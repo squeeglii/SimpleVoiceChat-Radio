@@ -142,6 +142,7 @@ if (project.properties["skip-publishing-init"] == "false") {
         mainFile.addModLoader("Fabric")
         mainFile.addModLoader("Quilt")
         mainFile.releaseType = project.properties["release_type"]
+        mainFile.addGameVersion("Server")
 
         mainFile.changelogType = "markdown"
         mainFile.changelog = new File(project.getRootDir(), "changelog.md")
