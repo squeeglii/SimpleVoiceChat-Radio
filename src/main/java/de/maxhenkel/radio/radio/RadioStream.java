@@ -19,10 +19,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nullable;
-import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -35,20 +33,21 @@ public class RadioStream implements Supplier<short[]> {
     private final BlockPos position;
 
     private UUID lastKnownChannelId;
-    private RadioStreamState state;
+    private volatile RadioStreamState state;
 
     private long lastValidityCheck;
 
     @Nullable
-    private LocationalAudioChannel channel;
+    private volatile LocationalAudioChannel channel;
     @Nullable
     private AudioPlayer audioPlayer;
     @Nullable
-    private Bitstream bitstream;
+    private volatile Bitstream bitstream;
     @Nullable
-    private Decoder decoder;
+    private volatile Decoder decoder;
     @Nullable
-    private StreamConverter streamConverter;
+    private volatile StreamConverter streamConverter;
+    private volatile boolean reconnecting;
 
     public RadioStream(RadioData radioData, ServerLevel serverLevel, BlockPos position) {
         this.radioData = radioData;
@@ -152,18 +151,25 @@ public class RadioStream implements Supplier<short[]> {
             return false;
         }
 
-        InputStream input = new URI(this.radioData.getUrl()).toURL().openStream();
-        this.bitstream = new Bitstream(new BufferedInputStream(input));
-        this.decoder = new Decoder();
+        this.reconnecting = false;
+        this.reconnectAttempts = 0;
+        this.openDecoder();
 
         this.audioPlayer.startPlaying();
         this.state = RadioStreamState.ACTIVE;
         return true;
     }
 
+    private void openDecoder() throws IOException {
+        InputStream input = RadioConnection.open(this.radioData.getUrl());
+        this.bitstream = new Bitstream(input);
+        this.decoder = new Decoder();
+    }
+
     public void stop() {
         Radio.LOGGER.debug("Stopping radio stream for '{}' ({})", radioData.getStationName(), radioData.getId());
         channel = null;
+        reconnecting = false;
         if (audioPlayer != null) {
             audioPlayer.stopPlaying();
             audioPlayer = null;
@@ -198,48 +204,130 @@ public class RadioStream implements Supplier<short[]> {
         return radioData;
     }
 
-    private int lastSampleCount;
+    private volatile int reconnectAttempts;
+
+    private static final int MAX_RECONNECT_ATTEMPTS = 5;
+    private static final long RECONNECT_DELAY_MS = 2000L;
+    private static final short[] SILENCE = new short[StreamConverter.FRAME_SIZE_SAMPLES];
+    private static final int MAX_DECODED_FRAME_SHORTS = 2304;
 
     @Override
     public short[] get() {
+        LocationalAudioChannel channel = this.channel;
         if (channel == null) {
             return null;
         }
+        checkValid();
+        spawnParticle();
+
+        if (reconnecting) {
+            return SILENCE;
+        }
+
+        Bitstream bitstream = this.bitstream;
+        Decoder decoder = this.decoder;
         if (bitstream == null || decoder == null) {
             throw new IllegalStateException("Radio stream not started");
         }
-        checkValid();
-        spawnParticle();
+
         try {
-            if (streamConverter != null) {
-                if (!streamConverter.canAdd(lastSampleCount)) {
-                    return streamConverter.getFrame();
-                }
+            StreamConverter converter = this.streamConverter;
+            if (converter != null && !converter.canAdd(MAX_DECODED_FRAME_SHORTS)) {
+                return converter.getFrame();
             }
 
             Header frameHeader = bitstream.readFrame();
             if (frameHeader == null) {
-                this.state = RadioStreamState.ERRORED_NO_CLEANUP;
-                throw new IOException("End of stream");
+                beginReconnect(new IOException("End of stream"));
+                return SILENCE;
             }
 
             SampleBuffer output = (SampleBuffer) decoder.decodeFrame(frameHeader, bitstream);
             short[] samples = output.getBuffer();
-            lastSampleCount = output.getBufferLength();
+            int length = output.getBufferLength();
             bitstream.closeFrame();
 
-            if (streamConverter == null) {
-                streamConverter = new StreamConverter(decoder.getOutputFrequency(), decoder.getOutputChannels());
+            if (converter == null) {
+                converter = new StreamConverter(decoder.getOutputFrequency(), decoder.getOutputChannels());
+                this.streamConverter = converter;
             }
 
-            streamConverter.add(samples, 0, output.getBufferLength());
-            return streamConverter.getFrame();
+            converter.add(samples, 0, length);
+            reconnectAttempts = 0;
+            return converter.getFrame();
         } catch (Exception e) {
-            Radio.LOGGER.warn("Failed to stream audio from {}", radioData.getUrl(), e);
-            stop();
-            this.state = RadioStreamState.ERRORED;
-            return null;
+            beginReconnect(e);
+            return SILENCE;
         }
+    }
+
+    private void beginReconnect(Exception cause) {
+        if (reconnecting) {
+            return;
+        }
+        reconnecting = true;
+
+        Bitstream old = this.bitstream;
+        this.bitstream = null;
+        this.decoder = null;
+        if (old != null) {
+            try {
+                old.close();
+            } catch (Exception ignored) {
+            }
+        }
+
+        Thread thread = new Thread(() -> runReconnect(cause), "RadioReconnect-%s".formatted(id));
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    private void runReconnect(Exception cause) {
+        while (this.channel != null) {
+            reconnectAttempts++;
+            if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
+                Radio.LOGGER.warn("Giving up on radio stream {} after {} reconnect attempts", radioData.getUrl(), reconnectAttempts - 1, cause);
+                this.state = RadioStreamState.ERRORED;
+                stop();
+                reconnecting = false;
+                return;
+            }
+
+            Radio.LOGGER.warn("Radio stream {} interrupted ({}). Reconnect attempt {}/{}",
+                    radioData.getUrl(), cause.getMessage(), reconnectAttempts, MAX_RECONNECT_ATTEMPTS);
+
+            try {
+                InputStream input = RadioConnection.open(this.radioData.getUrl());
+                Bitstream newBitstream = new Bitstream(input);
+                Decoder newDecoder = new Decoder();
+
+                if (this.channel == null) {
+                    try {
+                        newBitstream.close();
+                    } catch (Exception ignored) {
+                    }
+                    reconnecting = false;
+                    return;
+                }
+
+                this.streamConverter = null;
+                this.decoder = newDecoder;
+                this.bitstream = newBitstream;
+                reconnecting = false;
+                Radio.LOGGER.info("Reconnected radio stream {}", radioData.getUrl());
+                return;
+            } catch (Exception e) {
+                cause = e;
+                try {
+                    Thread.sleep(RECONNECT_DELAY_MS);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    reconnecting = false;
+                    return;
+                }
+            }
+        }
+        reconnecting = false;
     }
 
     private long lastParticle = 0L;
