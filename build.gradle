@@ -173,7 +173,7 @@ if (project.properties["skip-publishing-init"] == "false") {
         gameVersions = Arrays.asList(versions)
         loaders = ['fabric', 'quilt']
 
-        syncBodyFrom = file('readme.md').text
+        syncBodyFrom = file('README.md').text
         changelog = new File(project.getRootDir(), "changelog.md").readLines().join("\n")
 
         var shouldPublish = project.properties["debug_publishing"]
