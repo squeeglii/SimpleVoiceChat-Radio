@@ -1,0 +1,13 @@
+// Platform independent code shared by the Fabric mod and the Paper plugin.
+// This must not reference any Minecraft, Fabric or Bukkit classes.
+// Libraries are compileOnly - each platform shades (and relocates) them into its own jar.
+
+dependencies {
+    compileOnly "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}"
+    compileOnly "de.maxhenkel.configbuilder:configbuilder:${configbuilder_version}"
+    compileOnly "javazoom:jlayer:${jlayer_version}"
+
+    // Provided at runtime by both Minecraft and Paper
+    compileOnly 'org.slf4j:slf4j-api:2.0.17'
+    compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
+}

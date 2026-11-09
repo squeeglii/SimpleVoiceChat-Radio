@@ -1,6 +1,6 @@
 package de.maxhenkel.radio.radio;
 
-import de.maxhenkel.radio.Radio;
+import de.maxhenkel.radio.RadioCommon;
 import de.maxhenkel.radio.utils.CircularShortBuffer;
 
 public class StreamConverter {
@@ -43,7 +43,7 @@ public class StreamConverter {
     public short[] getFrame() {
         if (inputSampleRate == TARGET_SAMPLE_RATE && inputChannels == 1) {
             if (buffer.sizeUsed() < FRAME_SIZE_SAMPLES) {
-                Radio.LOGGER.debug("Not enough samples in buffer - waiting");
+                RadioCommon.LOGGER.debug("Not enough samples in buffer - waiting");
                 return new short[FRAME_SIZE_SAMPLES];
             }
             short[] samples = new short[FRAME_SIZE_SAMPLES];
@@ -52,7 +52,7 @@ public class StreamConverter {
         }
 
         if (buffer.sizeUsed() < sourceSamplesNeeded) {
-            Radio.LOGGER.debug("Not enough samples in buffer - waiting");
+            RadioCommon.LOGGER.debug("Not enough samples in buffer - waiting");
             return new short[FRAME_SIZE_SAMPLES];
         }
 

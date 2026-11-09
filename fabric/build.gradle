@@ -15,6 +15,12 @@ repositories {
     maven { url = 'https://maven.fabricmc.net/' }
 }
 
+// Dependencies bundled (and relocated) into the final jar by shadowJar.
+configurations {
+    shade
+    implementation.extendsFrom shade
+}
+
 loom {
     runs {
         client {
@@ -52,16 +58,16 @@ dependencies {
 
     implementation 'com.google.code.findbugs:jsr305:3.0.2'
 
-    implementation "de.maxhenkel.configbuilder:configbuilder:${configbuilder_version}"
-    shadow "de.maxhenkel.configbuilder:configbuilder:${configbuilder_version}"
+    shade project(':common')
+
+    shade "de.maxhenkel.configbuilder:configbuilder:${configbuilder_version}"
 
     implementation "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}"
 
     runtimeOnly "maven.modrinth:simple-voice-chat:fabric-${voicechat_mod_version}"
     runtimeOnly "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
 
-    implementation "javazoom:jlayer:${jlayer_version}"
-    shadow "javazoom:jlayer:${jlayer_version}"
+    shade "javazoom:jlayer:${jlayer_version}"
 }
 
 processResources {
@@ -79,6 +85,10 @@ java {
     withSourcesJar()
 }
 
+sourcesJar {
+    from project(':common').file('src/main/java')
+}
+
 jar {
     from(rootProject.file('LICENSE')) {
         rename { "${it}_${base.archivesName.get()}" }
@@ -86,7 +96,7 @@ jar {
 }
 
 shadowJar {
-    configurations = [project.configurations.shadow]
+    configurations = [project.configurations.shade]
     archiveClassifier = ''
     relocate 'de.maxhenkel.configbuilder', "de.maxhenkel.${mod_id}.configbuilder"
     relocate 'javazoom', "de.maxhenkel.${mod_id}.javazoom"

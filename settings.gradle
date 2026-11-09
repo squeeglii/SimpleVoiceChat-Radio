@@ -7,5 +7,6 @@ pluginManagement {
     }
 }
 
+// common: platform independent code shared by all platforms (no Minecraft classes)
 // fabric: the Fabric/Quilt mod
-include 'fabric'
+include 'common', 'fabric'

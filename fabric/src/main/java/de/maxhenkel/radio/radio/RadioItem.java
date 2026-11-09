@@ -1,11 +1,10 @@
 package de.maxhenkel.radio.radio;
 
-import de.maxhenkel.radio.Radio;
+import de.maxhenkel.radio.RadioCommon;
 import de.maxhenkel.radio.utils.HeadUtils;
 import it.unimi.dsi.fastutil.objects.ReferenceSortedSets;
 import net.minecraft.ChatFormatting;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.util.Util;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
@@ -13,6 +12,7 @@ import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.ItemLore;
 import net.minecraft.world.item.component.TooltipDisplay;
 
+import javax.annotation.Nullable;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
@@ -27,7 +27,7 @@ public class RadioItem {
 
     public static ItemStack fromData(RadioData radioData) {
         if(radioData == null) throw new NullPointerException("Radio Data must not be null");
-        RadioData data = radioData.getId() == Util.NIL_UUID
+        RadioData data = radioData.isAnonymous()
                 ? radioData
                 : RadioData.createAnonymousRadioData(radioData.getUrl(), radioData.getStationName(), radioData.isOn(), radioData.getRange());
 
@@ -36,7 +36,7 @@ public class RadioItem {
 
     private static ItemStack buildStack(RadioData data) {
         // profile UUID can be random.
-        ItemStack item =  HeadUtils.createHead(UUID.randomUUID(), "radio", Radio.SERVER_CONFIG.radioSkinUrl.get());
+        ItemStack item =  HeadUtils.createHead(UUID.randomUUID(), "radio", RadioCommon.SERVER_CONFIG.radioSkinUrl.get());
 
         List<Component> lore = new LinkedList<>();
 
@@ -50,7 +50,7 @@ public class RadioItem {
                     .withStyle(ChatFormatting.GRAY));
         }
 
-        data.serialiseIntoItemStack(item);
+        serialiseIntoItemStack(data, item);
 
         item.set(DataComponents.LORE, new ItemLore(lore));
         item.set(DataComponents.CUSTOM_NAME, Component.literal("Radio"));
@@ -71,7 +71,27 @@ public class RadioItem {
     }
 
     public static Optional<RadioData> readRadioData(CustomData data) {
-        return data.copyTag().read(RadioData.NBT_CATEGORY, RadioData.CODEC);
+        return data.copyTag().read(RadioData.NBT_CATEGORY, RadioCodecs.CODEC);
+    }
+
+    public static void serialiseIntoItemStack(RadioData radioData, ItemStack item) {
+        CustomData data = item.get(DataComponents.CUSTOM_DATA);
+        CustomData newData = saveToNewItemData(radioData, data);
+        item.set(DataComponents.CUSTOM_DATA, newData);
+    }
+
+    public static CustomData saveToNewItemData(RadioData radioData) {
+        return saveToNewItemData(radioData, null);
+    }
+
+    public static CustomData saveToNewItemData(RadioData radioData, @Nullable CustomData mergeWith) {
+        CompoundTag workingTag = mergeWith == null
+                ? new CompoundTag()
+                : mergeWith.copyTag();
+
+        workingTag.store(RadioData.NBT_CATEGORY, RadioCodecs.ITEM_CODEC, radioData);
+
+        return CustomData.of(workingTag);
     }
 
     public static void scrubRadioInCustomData(CompoundTag tag) {

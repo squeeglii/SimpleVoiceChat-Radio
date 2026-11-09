@@ -1,5 +1,7 @@
 package de.maxhenkel.radio.mixin;
 
+import de.maxhenkel.radio.radio.FabricRadioLocation;
+import de.maxhenkel.radio.radio.RadioCodecs;
 import de.maxhenkel.radio.radio.RadioData;
 import de.maxhenkel.radio.radio.RadioItem;
 import de.maxhenkel.radio.radio.RadioManager;
@@ -38,17 +40,17 @@ public class SkullBlockEntityMixin extends BlockEntity implements IPossibleRadio
     // block saving / loading
     @Inject(method = "loadAdditional", at = @At("RETURN"))
     public void load(ValueInput valueInput, CallbackInfo ci) {
-        this.data = valueInput.read(RadioData.NBT_CATEGORY, RadioData.CODEC).orElse(null);
+        this.data = valueInput.read(RadioData.NBT_CATEGORY, RadioCodecs.CODEC).orElse(null);
 
         if(this.data != null && this.level != null && !this.level.isClientSide()) {
-            RadioManager.getInstance().updateRadioStream(this.data, (ServerLevel) this.level, (SkullBlockEntity) (Object) this);
+            RadioManager.getInstance().updateRadioStream(this.data, new FabricRadioLocation((ServerLevel) this.level, this.getBlockPos()));
         }
     }
 
     @Inject(method = "saveAdditional", at = @At("RETURN"))
     public void save(ValueOutput valueOutput, CallbackInfo ci) {
         if(this.data != null) {
-            valueOutput.store(RadioData.NBT_CATEGORY, RadioData.CODEC, this.data);
+            valueOutput.store(RadioData.NBT_CATEGORY, RadioCodecs.CODEC, this.data);
         }
     }
 
@@ -70,7 +72,7 @@ public class SkullBlockEntityMixin extends BlockEntity implements IPossibleRadio
 
         // data is non-null by this point - no need to check.
         if(this.level != null && !this.level.isClientSide()) {
-            RadioManager.getInstance().updateRadioStream(this.data, (ServerLevel) this.level, (SkullBlockEntity) (Object) this);
+            RadioManager.getInstance().updateRadioStream(this.data, new FabricRadioLocation((ServerLevel) this.level, this.getBlockPos()));
         }
     }
 
@@ -79,7 +81,7 @@ public class SkullBlockEntityMixin extends BlockEntity implements IPossibleRadio
     protected void collectExtraComponents(DataComponentMap.Builder builder, CallbackInfo ci) {
         if(this.data == null) return;
 
-        CustomData data = this.data.saveToNewItemData();
+        CustomData data = RadioItem.saveToNewItemData(this.data);
         builder.set(DataComponents.CUSTOM_DATA, data);
     }
 
@@ -90,7 +92,7 @@ public class SkullBlockEntityMixin extends BlockEntity implements IPossibleRadio
 
         if (oldLevel == null && newLevel != null && !newLevel.isClientSide()) {
             if(this.data != null)
-                RadioManager.getInstance().updateRadioStream(this.data, (ServerLevel) newLevel, (SkullBlockEntity) (Object) this);
+                RadioManager.getInstance().updateRadioStream(this.data, new FabricRadioLocation((ServerLevel) newLevel, this.getBlockPos()));
         }
     }
 

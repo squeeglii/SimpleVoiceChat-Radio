@@ -32,7 +32,7 @@ public class RadioVoicechatPlugin implements VoicechatPlugin {
 
     @Override
     public String getPluginId() {
-        return Radio.MODID;
+        return RadioCommon.MODID;
     }
 
     @Override

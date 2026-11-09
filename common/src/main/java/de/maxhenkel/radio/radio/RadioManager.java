@@ -1,21 +1,12 @@
 package de.maxhenkel.radio.radio;
 
-import com.mojang.authlib.GameProfile;
-import de.maxhenkel.radio.Radio;
-import de.maxhenkel.radio.utils.IPossibleRadioBlock;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.SectionPos;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.item.component.ResolvableProfile;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.SkullBlockEntity;
-import net.minecraft.world.level.chunk.LevelChunk;
+import de.maxhenkel.radio.RadioCommon;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 public class RadioManager {
 
@@ -31,17 +22,17 @@ public class RadioManager {
      * This can be used to refresh the properties of the stream if they are updated while a stream is already playing.
      * @return true if this method has modified the contents of the RadioData parameter.
      */
-    public boolean updateRadioStream(RadioData radioData, ServerLevel serverLevel, BlockEntity skullBlockEntity) {
+    public boolean updateRadioStream(RadioData radioData, RadioLocation location) {
         boolean idChanged = radioData.assignIdIfNil();
 
-        RadioStream radioStream = new RadioStream(radioData, serverLevel, skullBlockEntity.getBlockPos());
-        Radio.LOGGER.debug("Loaded radio stream for '{}' ({})", radioData.getStationName(), radioData.getId());
+        RadioStream radioStream = new RadioStream(radioData, location);
+        RadioCommon.LOGGER.debug("Loaded radio stream for '{}' ({})", radioData.getStationName(), radioData.getId());
         radioStream.init();
         RadioStream oldStream = this.radioStreams.put(radioData.getId(), radioStream);
 
         if (oldStream != null) {
             oldStream.close();
-            Radio.LOGGER.warn("Replacing radio stream for '{}' ({})  - Old stream state was '{}'", radioData.getStationName(), radioData.getId(), oldStream.getState());
+            RadioCommon.LOGGER.warn("Replacing radio stream for '{}' ({})  - Old stream state was '{}'", radioData.getStationName(), radioData.getId(), oldStream.getState());
         }
 
         return idChanged;
@@ -55,26 +46,14 @@ public class RadioManager {
         return this.getRadioStream(radio.getId());
     }
 
-    public static boolean isValidRadioLocation(UUID id, BlockPos pos, ServerLevel level) {
-        if (!level.isLoaded(pos))
-            return false;
-
-        BlockEntity blockEntity = level.getBlockEntity(pos);
-
-        if(!(blockEntity instanceof IPossibleRadioBlock radioBlock))
-            return false;
-
-        return radioBlock.radio$isRadio() && radioBlock.radio$getRadioData().getId().equals(id);
-    }
-
     public void onRemoveHead(UUID id) {
         RadioStream radioStream = this.radioStreams.remove(id);
 
         if (radioStream != null) {
             radioStream.close();
-            Radio.LOGGER.debug("Removed radio stream for '{}' ({})", radioStream.getRadioData().getStationName(), radioStream.getRadioData().getId());
+            RadioCommon.LOGGER.debug("Removed radio stream for '{}' ({})", radioStream.getRadioData().getStationName(), radioStream.getRadioData().getId());
         } else {
-            Radio.LOGGER.debug("Removed radio stream {}", id);
+            RadioCommon.LOGGER.debug("Removed radio stream {}", id);
         }
     }
 
@@ -88,9 +67,12 @@ public class RadioManager {
     public void updateHeadOnState(UUID id, boolean on) {
         RadioStream radioStream = this.radioStreams.get(id);
         if (radioStream == null) {
-            Radio.LOGGER.info("No stream detected.");
+            RadioCommon.LOGGER.info("No stream detected.");
             return;
         }
+
+        // Keeps the stream's copy in sync on platforms where it isn't the same instance that the block stores.
+        radioStream.getRadioData().setOn(on);
 
         if (on) {
             radioStream.start();
@@ -99,20 +81,17 @@ public class RadioManager {
         }
     }
 
-    public void onChunkUnload(ServerLevel serverLevel, LevelChunk levelChunk) {
+    /**
+     * Closes and removes all streams matching the filter - e.g. all streams within an unloaded chunk.
+     */
+    public void removeStreamsIf(Predicate<RadioStream> filter) {
         radioStreams.values().removeIf(radioStream -> {
-            boolean remove = radioStream.getServerLevel().dimension().equals(serverLevel.dimension()) && isInChunk(radioStream.getPosition(), levelChunk.getPos());
+            boolean remove = filter.test(radioStream);
             if (remove) {
                 radioStream.close();
             }
             return remove;
         });
-    }
-
-    private static boolean isInChunk(BlockPos pos, ChunkPos chunkPos) {
-        int chunkX = SectionPos.blockToSectionCoord(pos.getX());
-        int chunkZ = SectionPos.blockToSectionCoord(pos.getZ());
-        return chunkX == chunkPos.x() && chunkZ == chunkPos.z();
     }
 
     public void clear() {
