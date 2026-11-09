@@ -1,0 +1,16 @@
+name: SVC-Radio
+version: '${version}'
+main: de.maxhenkel.radio.paper.RadioPaperPlugin
+api-version: '${minecraft_dependency}'
+description: Radio blocks that stream mp3 radio stations through Simple Voice Chat
+authors:
+  - Max Henkel
+  - CG360
+
+dependencies:
+  server:
+    voicechat:
+      load: BEFORE
+      required: true
+      # The Simple Voice Chat API classes are provided by the voicechat plugin
+      join-classpath: true
