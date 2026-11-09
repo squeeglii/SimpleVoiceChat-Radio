@@ -6,3 +6,6 @@ pluginManagement {
         maven { url = 'https://maven.maxhenkel.de/repository/public' }
     }
 }
+
+// fabric: the Fabric/Quilt mod
+include 'fabric'
