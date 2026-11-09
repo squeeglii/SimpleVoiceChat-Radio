@@ -153,15 +153,31 @@ public class RadioStream implements Supplier<short[]> {
         }
 
         InputStream input = new URI(this.radioData.getUrl()).toURL().openStream();
-        this.bitstream = new Bitstream(new BufferedInputStream(input));
-        this.decoder = new Decoder();
+        Bitstream bitstream = new Bitstream(new BufferedInputStream(input));
 
-        this.audioPlayer.startPlaying();
-        this.state = RadioStreamState.ACTIVE;
-        return true;
+        // Connecting can take a while, so the stream may have been stopped in the meantime
+        // (e.g. its chunk was unloaded again). Synchronised with stop() so this check can't race it.
+        synchronized (this) {
+            if (this.audioPlayer == null) {
+                Radio.LOGGER.debug("Radio stream was stopped while connecting", trace);
+                try {
+                    bitstream.close();
+                } catch (Exception e) {
+                    Radio.LOGGER.warn("Failed to close bitstream", e);
+                }
+                return false;
+            }
+
+            this.bitstream = bitstream;
+            this.decoder = new Decoder();
+
+            this.audioPlayer.startPlaying();
+            this.state = RadioStreamState.ACTIVE;
+            return true;
+        }
     }
 
-    public void stop() {
+    public synchronized void stop() {
         Radio.LOGGER.debug("Stopping radio stream for '{}' ({})", radioData.getStationName(), radioData.getId());
         channel = null;
         if (audioPlayer != null) {
