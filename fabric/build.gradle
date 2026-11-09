@@ -1,0 +1,204 @@
+import org.gradle.api.GradleException
+
+// Plugin versions are declared in the root build.gradle
+plugins {
+    id('net.fabricmc.fabric-loom')
+    id("com.gradleup.shadow")
+}
+
+String mod_version = "%s+%s".formatted(mod_base_version, mod_version_meta)
+
+base.archivesName = archives_base_name
+version = mod_version
+
+repositories {
+    maven { url = 'https://maven.fabricmc.net/' }
+}
+
+// Dependencies bundled (and relocated) into the final jar by shadowJar.
+configurations {
+    shade
+    implementation.extendsFrom shade
+}
+
+loom {
+    runs {
+        client {
+            client()
+            runDir = "../run/client"
+            ideConfigGenerated = true
+        }
+
+        server {
+            server()
+            runDir = "../run/server"
+            ideConfigGenerated = true
+        }
+    }
+}
+
+runClient.doFirst {
+    args = ['--username', "SVC-Dev.${new Random().nextInt(1000)}"]
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_dependency}"
+
+    implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+
+    Set<String> apiModules = [
+            'fabric-api-base',
+            'fabric-command-api-v2',
+            'fabric-lifecycle-events-v1'
+    ]
+
+    apiModules.forEach {
+        include(implementation(fabricApi.module(it, fabric_api_version)))
+    }
+
+    implementation 'com.google.code.findbugs:jsr305:3.0.2'
+
+    shade project(':common')
+
+    shade "de.maxhenkel.configbuilder:configbuilder:${configbuilder_version}"
+
+    implementation "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}"
+
+    runtimeOnly "maven.modrinth:simple-voice-chat:fabric-${voicechat_mod_version}"
+    runtimeOnly "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+
+    shade "javazoom:jlayer:${jlayer_version}"
+}
+
+processResources {
+    filteringCharset "UTF-8"
+
+    HashMap modifiedSrc = new HashMap<>(project.properties)
+    modifiedSrc.put("mod_version", mod_version)
+
+    filesMatching("fabric.mod.json") {
+        expand modifiedSrc
+    }
+}
+
+java {
+    withSourcesJar()
+}
+
+sourcesJar {
+    from project(':common').file('src/main/java')
+}
+
+jar {
+    from(rootProject.file('LICENSE')) {
+        rename { "${it}_${base.archivesName.get()}" }
+    }
+}
+
+shadowJar {
+    configurations = [project.configurations.shade]
+    archiveClassifier = ''
+    relocate 'de.maxhenkel.configbuilder', "de.maxhenkel.${mod_id}.configbuilder"
+    relocate 'javazoom', "de.maxhenkel.${mod_id}.javazoom"
+}
+
+if (project.properties["skip-publishing-init"] == "false") {
+    print("Defining publishing remotes")
+
+    apply plugin: "com.modrinth.minotaur"
+    apply from: "$rootDir/publishing.gradle"
+
+    // Qualified reference so it can be conditionally imported.
+    tasks.register('curseforge', net.darkhax.curseforgegradle.TaskPublishCurseForge) {
+        group = "upload"
+        description = "Publishes project to CurseForge"
+
+        String mcVer = project.properties["minecraft_dependency"]
+        String projectVer = project.properties["mod_base_version"]
+        String projectId = project.properties["curse_id"]
+
+        if(projectVer == null || projectVer.isBlank())
+            throw new IllegalStateException("Project version should not be null when publishing.")
+
+        apiToken = getCurseToken(project)
+
+        var shouldPublish = project.properties["debug_publishing"]
+        if(shouldPublish != null && shouldPublish.toString().equalsIgnoreCase("true"))
+            debugMode = true
+
+        def mainFile = upload(projectId, shadowJar)
+        mainFile.displayName = "[FABRIC][${mcVer}] ${mod_title} v${projectVer}"
+        mainFile.addModLoader("Fabric")
+        mainFile.addModLoader("Quilt")
+        mainFile.releaseType = project.properties["release_type"]
+        mainFile.addGameVersion("Server")
+
+        mainFile.changelogType = "markdown"
+        mainFile.changelog = new File(project.getRootDir(), "changelog.md")
+
+        for(String version: getSupportedVersions(project.properties))
+            mainFile.addGameVersion(version)
+
+        mainFile.addRequirement("simple-voice-chat")
+
+    }
+
+    tasks.modrinth.configure({
+        group = 'upload'
+    })
+    tasks.modrinthSyncBody.configure({
+        group = 'upload'
+    })
+
+    modrinth {
+        String[] versions = getSupportedVersions(project.properties);
+
+        token = getModrinthToken(project)
+        projectId = modrinth_id
+        versionName = "[FABRIC][${minecraft_dependency}] ${mod_title} v${mod_base_version}"
+        versionNumber = "${mod_version}"
+        versionType = release_type.toUpperCase()
+        uploadFile = shadowJar
+        gameVersions = Arrays.asList(versions)
+        loaders = ['fabric', 'quilt']
+
+        syncBodyFrom = rootProject.file('README.md').text
+        changelog = new File(project.getRootDir(), "changelog.md").readLines().join("\n")
+
+        var shouldPublish = project.properties["debug_publishing"]
+        if(shouldPublish != null && shouldPublish.toString().equalsIgnoreCase("true"))
+            setDebugMode(true)
+
+        dependencies {
+            required.project '9eGKb6K1' // Simple Voice Chat
+        }
+    }
+    tasks.modrinth.dependsOn(build)
+
+} else {
+    print("Publishing init disabled in gradle.properties.")
+
+    tasks.register('curseforge') {
+        group = 'upload'
+
+        doLast {
+            throw new GradleException("Publishing init has been disabled in gradle.properties so Curseforge publishing is not available.")
+        }
+    }
+
+    tasks.register('modrinth') {
+        group = 'upload'
+        doLast {
+            throw new GradleException("Publishing init has been disabled in gradle.properties so Modrinth publishing is not available.")
+        }
+    }
+
+    tasks.register('modrinthSyncBody') {
+        group = 'upload'
+        doLast {
+            throw new GradleException("Publishing init has been disabled in gradle.properties so Modrinth authoring is not available.")
+        }
+    }
+}
+
+

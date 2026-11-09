@@ -6,3 +6,8 @@ pluginManagement {
         maven { url = 'https://maven.maxhenkel.de/repository/public' }
     }
 }
+
+// common: platform independent code shared by all platforms (no Minecraft classes)
+// fabric: the Fabric/Quilt mod
+// paper:  the Paper plugin
+include 'common', 'fabric', 'paper'

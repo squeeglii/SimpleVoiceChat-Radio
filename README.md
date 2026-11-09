@@ -1,6 +1,6 @@
 # Simple Voice Chat Radio
 
-A server-side Simple Voice Chat addon mod for Fabric adding a radio block capable of streaming mp3 radio streams.
+A server-side Simple Voice Chat addon for Fabric and Paper adding a radio block capable of streaming mp3 radio streams.
 
 ## Disclaimer
 
@@ -10,7 +10,9 @@ The mp3 stream must be playable by [JLayer](https://web.archive.org/web/20210108
 
 ## Usage
 
-- Install this mod alongside [Simple Voice Chat](https://modrinth.com/plugin/simple-voice-chat) on your server
+- Install this alongside [Simple Voice Chat](https://modrinth.com/plugin/simple-voice-chat) on your server
+  - **Fabric:** put the `fabric` jar into your `mods` folder, next to the Fabric version of Simple Voice Chat
+  - **Paper:** put the `paper` jar into your `plugins` folder, next to the Bukkit/Paper version of Simple Voice Chat
 - Make sure you set up the voice chat mod correctly (see [here](https://modrepo.de/minecraft/voicechat/wiki/server_setup))
 - Get the mp3 livestream URL of your favorite radio station
 - Enter the command `/radio create "<stream-url>" "<station-name>" [sound_radius]` to create a radio block
@@ -33,6 +35,17 @@ If you want to search for a radio station, [streamurl.link](https://streamurl.li
 - `/radio debug <location: blockpos>` - Provides you a bunch of data on a placed radio's state in chat. If an radio isn't
    behaving correctly, double check this.
 
+On Paper, the `/radio` command requires the `radio.command` permission. By default, everyone has it if
+`command_permission_level` is `0`, otherwise only operators do - permission plugins can grant or revoke it either way.
+
+## Paper
+
+The Paper plugin behaves the same as the Fabric mod. A few things to be aware of:
+
+- It requires Paper (or a fork of it) - Spigot and Folia are not supported.
+- Radios store their data differently on each platform, so radios placed or created on a Fabric server won't work
+  on a Paper server and vice versa.
+
 ## Contact
 
 For support with this mod, please contact @CG360 via:
@@ -41,6 +54,8 @@ For support with this mod, please contact @CG360 via:
 - **Github:** [/squeeglii](https://github.com/squeeglii)
 
 ## Configuration
+
+The config file is located at `config/radio/radio.properties` on Fabric and `plugins/SVC-Radio/radio.properties` on Paper.
 
 | Property                   | Description                                            | Default |
 |----------------------------|--------------------------------------------------------|---------|

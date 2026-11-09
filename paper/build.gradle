@@ -1,0 +1,75 @@
+// Plugin versions are declared in the root build.gradle
+plugins {
+    id("com.gradleup.shadow")
+    id("xyz.jpenilla.run-paper")
+}
+
+String plugin_version = "%s+%s".formatted(mod_base_version, plugin_version_meta)
+
+base.archivesName = archives_base_name
+version = plugin_version
+
+repositories {
+    maven { url = 'https://repo.papermc.io/repository/maven-public/' }
+}
+
+// Dependencies bundled (and relocated) into the final jar by shadowJar.
+configurations {
+    shade
+    implementation.extendsFrom shade
+}
+
+dependencies {
+    compileOnly "io.papermc.paper:paper-api:${paper_api_version}"
+    compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
+
+    // Provided at runtime by the Simple Voice Chat plugin - it must not be bundled.
+    compileOnly "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}"
+
+    shade project(':common')
+    shade "de.maxhenkel.configbuilder:configbuilder:${configbuilder_version}"
+    shade "javazoom:jlayer:${jlayer_version}"
+}
+
+processResources {
+    filteringCharset = "UTF-8"
+
+    Map<String, String> pluginProperties = [
+            version             : plugin_version,
+            minecraft_dependency: minecraft_dependency
+    ]
+    inputs.properties(pluginProperties)
+
+    filesMatching("paper-plugin.yml") {
+        expand pluginProperties
+    }
+}
+
+java {
+    withSourcesJar()
+}
+
+sourcesJar {
+    from project(':common').file('src/main/java')
+}
+
+jar {
+    // The shadowJar output is the plugin jar.
+    archiveClassifier = 'dev'
+}
+
+shadowJar {
+    configurations = [project.configurations.shade]
+    archiveClassifier = ''
+    relocate 'de.maxhenkel.configbuilder', "de.maxhenkel.${mod_id}.configbuilder"
+    relocate 'javazoom', "de.maxhenkel.${mod_id}.javazoom"
+}
+
+tasks.named('runServer') {
+    minecraftVersion(minecraft_dependency)
+    runDirectory = rootProject.file('run/paper')
+
+    downloadPlugins {
+        modrinth("simple-voice-chat", "bukkit-${voicechat_bukkit_version}")
+    }
+}
