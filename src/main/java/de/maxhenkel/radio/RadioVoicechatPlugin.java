@@ -1,5 +1,6 @@
 package de.maxhenkel.radio;
 
+import de.maxhenkel.voicechat.api.ForgeVoicechatPlugin;
 import de.maxhenkel.voicechat.api.VoicechatApi;
 import de.maxhenkel.voicechat.api.VoicechatPlugin;
 import de.maxhenkel.voicechat.api.VoicechatServerApi;
@@ -16,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 
+@ForgeVoicechatPlugin
 public class RadioVoicechatPlugin implements VoicechatPlugin {
 
     public static String RADIOS_CATEGORY = "radios";

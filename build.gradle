@@ -2,9 +2,11 @@ import org.gradle.api.GradleException
 
 plugins {
     id("java")
-    id('net.fabricmc.fabric-loom') version '1.17-SNAPSHOT'
+    id('idea')
+    id('eclipse')
+    id('net.minecraftforge.gradle') version '[7.0.17,8)'
     id("com.gradleup.shadow") version "9.4.0"
-    
+
     id("com.modrinth.minotaur") version "2.10.0" apply false
     id("net.darkhax.curseforgegradle") version "1.1.18" apply false
 }
@@ -18,10 +20,31 @@ base.archivesName = archives_base_name
 group = maven_group
 version = mod_version
 
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+minecraft {
+    runs {
+        configureEach {
+            workingDir = layout.projectDirectory.dir('run')
+            systemProperty 'eventbus.api.strictRuntimeChecks', 'true'
+            args '--mixin.config=radio.mixins.json'
+        }
+        register('client') {
+            workingDir = layout.projectDirectory.dir('run/client')
+        }
+        register('server') {
+            workingDir = layout.projectDirectory.dir('run/server')
+            args '--nogui'
+        }
+    }
+}
+
 repositories {
     mavenLocal()
     mavenCentral()
-    maven { url = 'https://maven.fabricmc.net/' }
+    minecraft.mavenizer(it)
+    maven fg.forgeMaven
+    maven fg.minecraftLibsMaven
     maven { url = 'https://maven.maxhenkel.de/repository/public' }
     maven {
         url = 'https://api.modrinth.com/maven'
@@ -31,40 +54,9 @@ repositories {
     }
 }
 
-loom {
-    runs {
-        client {
-            client()
-            runDir = "run/client"
-            ideConfigGenerated = true
-        }
-
-        server {
-            server()
-            runDir = "run/server"
-            ideConfigGenerated = true
-        }
-    }
-}
-
-runClient.doFirst {
-    args = ['--username', "SVC-Dev.${new Random().nextInt(1000)}"]
-}
-
 dependencies {
-    minecraft "com.mojang:minecraft:${minecraft_dependency}"
-
-    implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
-
-    Set<String> apiModules = [
-            'fabric-api-base',
-            'fabric-command-api-v2',
-            'fabric-lifecycle-events-v1'
-    ]
-
-    apiModules.forEach {
-        include(implementation(fabricApi.module(it, fabric_api_version)))
-    }
+    implementation minecraft.dependency("net.minecraftforge:forge:${minecraft_dependency}-${forge_version}")
+    annotationProcessor 'net.minecraftforge:eventbus-validator:7.0.6'
 
     implementation 'com.google.code.findbugs:jsr305:3.0.2'
 
@@ -73,21 +65,26 @@ dependencies {
 
     implementation "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}"
 
-    runtimeOnly "maven.modrinth:simple-voice-chat:fabric-${voicechat_mod_version}"
-    runtimeOnly "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+    runtimeOnly "maven.modrinth:simple-voice-chat:forge-${voicechat_mod_version}"
 
     implementation "javazoom:jlayer:${jlayer_version}"
     shadow "javazoom:jlayer:${jlayer_version}"
 }
 
-processResources {
-    filteringCharset "UTF-8"
-
-    HashMap modifiedSrc = new HashMap<>(project.properties)
-    modifiedSrc.put("mod_version", mod_version)
-
-    filesMatching("fabric.mod.json") {
-        expand modifiedSrc
+tasks.named('processResources', ProcessResources).configure {
+    var replaceProperties = [
+            minecraft_dependency   : minecraft_dependency,
+            forge_version          : forge_version,
+            forge_version_range    : forge_version_range,
+            loader_version_range   : loader_version_range,
+            voicechat_api_version  : voicechat_api_version,
+            mod_id                 : mod_id,
+            mod_title              : mod_title,
+            mod_version            : mod_version
+    ]
+    inputs.properties replaceProperties
+    filesMatching(['META-INF/mods.toml']) {
+        expand replaceProperties
     }
 }
 
@@ -104,6 +101,17 @@ jar {
     from('LICENSE') {
         rename { "${it}_${archivesBaseName}" }
     }
+    manifest {
+        attributes([
+                'Specification-Title'     : mod_id,
+                'Specification-Vendor'    : 'Max Henkel, CG360',
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : project.name,
+                'Implementation-Version'  : project.jar.archiveVersion,
+                'Implementation-Vendor'   : 'Max Henkel, CG360',
+                'MixinConfigs'            : 'radio.mixins.json'
+        ])
+    }
 }
 
 shadowJar {
@@ -111,6 +119,11 @@ shadowJar {
     archiveClassifier = ''
     relocate 'de.maxhenkel.configbuilder', "de.maxhenkel.${mod_id}.configbuilder"
     relocate 'javazoom', "de.maxhenkel.${mod_id}.javazoom"
+    mergeServiceFiles()
+}
+
+tasks.named('build').configure {
+    dependsOn shadowJar
 }
 
 if (project.properties["skip-publishing-init"] == "false") {
@@ -119,7 +132,6 @@ if (project.properties["skip-publishing-init"] == "false") {
     apply plugin: "com.modrinth.minotaur"
     apply from: "$rootDir/publishing.gradle"
 
-    // Qualified reference so it can be conditionally imported.
     tasks.register('curseforge', net.darkhax.curseforgegradle.TaskPublishCurseForge) {
         group = "upload"
         description = "Publishes project to CurseForge"
@@ -138,9 +150,8 @@ if (project.properties["skip-publishing-init"] == "false") {
             debugMode = true
 
         def mainFile = upload(projectId, shadowJar)
-        mainFile.displayName = "[FABRIC][${mcVer}] ${mod_title} v${projectVer}"
-        mainFile.addModLoader("Fabric")
-        mainFile.addModLoader("Quilt")
+        mainFile.displayName = "[FORGE][${mcVer}] ${mod_title} v${projectVer}"
+        mainFile.addModLoader("Forge")
         mainFile.releaseType = project.properties["release_type"]
         mainFile.addGameVersion("Server")
 
@@ -151,7 +162,6 @@ if (project.properties["skip-publishing-init"] == "false") {
             mainFile.addGameVersion(version)
 
         mainFile.addRequirement("simple-voice-chat")
-
     }
 
     tasks.modrinth.configure({
@@ -166,12 +176,12 @@ if (project.properties["skip-publishing-init"] == "false") {
 
         token = getModrinthToken(project)
         projectId = modrinth_id
-        versionName = "[FABRIC][${minecraft_dependency}] ${mod_title} v${mod_base_version}"
+        versionName = "[FORGE][${minecraft_dependency}] ${mod_title} v${mod_base_version}"
         versionNumber = "${mod_version}"
         versionType = release_type.toUpperCase()
         uploadFile = shadowJar
         gameVersions = Arrays.asList(versions)
-        loaders = ['fabric', 'quilt']
+        loaders = ['forge']
 
         syncBodyFrom = file('readme.md').text
         changelog = new File(project.getRootDir(), "changelog.md").readLines().join("\n")
@@ -212,4 +222,9 @@ if (project.properties["skip-publishing-init"] == "false") {
     }
 }
 
-
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}
