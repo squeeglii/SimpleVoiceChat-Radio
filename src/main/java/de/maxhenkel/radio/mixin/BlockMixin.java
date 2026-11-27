@@ -24,7 +24,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class BlockMixin {
 
     // 26.3: playerDestroy is ServerLevel + ServerPlayer (was Level + Player)
-    @Inject(method = "playerDestroy", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/block/Block;dropResources(Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/entity/BlockEntity;Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/item/ItemStack;)V"), cancellable = true)
+    // Forge: playerDestroy() calls dropResources(state, level, pos, blockEntity, player, destroyedWith, false); 7 parameters. Added Z.
+    @Inject(method = "playerDestroy", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/block/Block;dropResources(Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/entity/BlockEntity;Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/item/ItemStack;Z)V"), cancellable = true)
     public void playerDestroy(ServerLevel level, ServerPlayer player, BlockPos blockPos, BlockState blockState, BlockEntity blockEntity, ItemStack itemStack, CallbackInfo ci) {
         boolean isNotPlayerHeadBlock = !blockState.getBlock().equals(Blocks.PLAYER_HEAD) &&
                                        !blockState.getBlock().equals(Blocks.PLAYER_WALL_HEAD);

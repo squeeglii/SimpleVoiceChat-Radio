@@ -1,17 +1,17 @@
 import org.gradle.api.GradleException
 
 plugins {
-    id("java-library")
-    id('maven-publish')
-    id('net.neoforged.moddev') version '2.0.148'
-    id("com.gradleup.shadow") version "9.4.0"
+    id("java")
     id('idea')
+    id('eclipse')
+    id('net.minecraftforge.gradle') version '[7.0.17,8)'
+    id("com.gradleup.shadow") version "9.4.0"
 
     id("com.modrinth.minotaur") version "2.10.0" apply false
     id("net.darkhax.curseforgegradle") version "1.1.18" apply false
 }
 
-apply plugin: "java-library"
+apply plugin: "java"
 apply plugin: "com.gradleup.shadow"
 
 String mod_version = "%s+%s".formatted(mod_base_version, mod_version_meta)
@@ -22,28 +22,19 @@ version = mod_version
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 
-neoForge {
-    version = project.neo_version
-
+minecraft {
     runs {
-        client {
-            client()
-            gameDirectory = project.file('run/client')
-        }
-        server {
-            server()
-            gameDirectory = project.file('run/server')
-            programArgument '--nogui'
-        }
         configureEach {
-            systemProperty 'forge.logging.markers', 'REGISTRIES'
-            logLevel = org.slf4j.event.Level.DEBUG
+            workingDir = layout.projectDirectory.dir('run')
+            systemProperty 'eventbus.api.strictRuntimeChecks', 'true'
+            args '--mixin.config=radio.mixins.json'
         }
-    }
-
-    mods {
-        "${mod_id}" {
-            sourceSet(sourceSets.main)
+        register('client') {
+            workingDir = layout.projectDirectory.dir('run/client')
+        }
+        register('server') {
+            workingDir = layout.projectDirectory.dir('run/server')
+            args '--nogui'
         }
     }
 }
@@ -51,6 +42,9 @@ neoForge {
 repositories {
     mavenLocal()
     mavenCentral()
+    minecraft.mavenizer(it)
+    maven fg.forgeMaven
+    maven fg.minecraftLibsMaven
     maven { url = 'https://maven.maxhenkel.de/repository/public' }
     maven {
         url = 'https://api.modrinth.com/maven'
@@ -61,6 +55,9 @@ repositories {
 }
 
 dependencies {
+    implementation minecraft.dependency("net.minecraftforge:forge:${minecraft_dependency}-${forge_version}")
+    annotationProcessor 'net.minecraftforge:eventbus-validator:7.0.6'
+
     implementation 'com.google.code.findbugs:jsr305:3.0.2'
 
     implementation "de.maxhenkel.configbuilder:configbuilder:${configbuilder_version}"
@@ -68,32 +65,28 @@ dependencies {
 
     implementation "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}"
 
-    runtimeOnly "maven.modrinth:simple-voice-chat:neoforge-${voicechat_mod_version}"
+    runtimeOnly "maven.modrinth:simple-voice-chat:forge-${voicechat_mod_version}"
 
     implementation "javazoom:jlayer:${jlayer_version}"
     shadow "javazoom:jlayer:${jlayer_version}"
 }
 
-var generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
+tasks.named('processResources', ProcessResources).configure {
     var replaceProperties = [
-		minecraft_version      : minecraft_dependency,
-		minecraft_version_range: minecraft_version_range,
-		neo_version            : neo_version,
-		voicechat_api_version  : voicechat_api_version,
-		mod_id                 : mod_id,
-		mod_name               : mod_title,
-		mod_license            : 'All Rights Reserved',
-		mod_version            : mod_version,
-		mod_authors            : 'Max Henkel, CG360',
-		mod_description        : 'Simple Voice Chat Radio'
+            minecraft_dependency   : minecraft_dependency,
+            forge_version          : forge_version,
+            forge_version_range    : forge_version_range,
+            loader_version_range   : loader_version_range,
+            voicechat_api_version  : voicechat_api_version,
+            mod_id                 : mod_id,
+            mod_title              : mod_title,
+            mod_version            : mod_version
     ]
     inputs.properties replaceProperties
-    expand replaceProperties
-    from 'src/main/templates'
-    into 'build/generated/sources/modMetadata'
+    filesMatching(['META-INF/mods.toml']) {
+        expand replaceProperties
+    }
 }
-sourceSets.main.resources.srcDir generateModMetadata
-neoForge.ideSyncTask generateModMetadata
 
 tasks.withType(JavaCompile).configureEach {
     it.options.encoding = 'UTF-8'
@@ -109,7 +102,15 @@ jar {
         rename { "${it}_${archivesBaseName}" }
     }
     manifest {
-        attributes(['MixinConfigs': 'radio.mixins.json'])
+        attributes([
+                'Specification-Title'     : mod_id,
+                'Specification-Vendor'    : 'Max Henkel, CG360',
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : project.name,
+                'Implementation-Version'  : project.jar.archiveVersion,
+                'Implementation-Vendor'   : 'Max Henkel, CG360',
+                'MixinConfigs'            : 'radio.mixins.json'
+        ])
     }
 }
 
@@ -149,8 +150,8 @@ if (project.properties["skip-publishing-init"] == "false") {
             debugMode = true
 
         def mainFile = upload(projectId, shadowJar)
-        mainFile.displayName = "[NEOFORGE][${mcVer}] ${mod_title} v${projectVer}"
-        mainFile.addModLoader("NeoForge")
+        mainFile.displayName = "[FORGE][${mcVer}] ${mod_title} v${projectVer}"
+        mainFile.addModLoader("Forge")
         mainFile.releaseType = project.properties["release_type"]
         mainFile.addGameVersion("Server")
 
@@ -161,7 +162,6 @@ if (project.properties["skip-publishing-init"] == "false") {
             mainFile.addGameVersion(version)
 
         mainFile.addRequirement("simple-voice-chat")
-
     }
 
     tasks.modrinth.configure({
@@ -176,12 +176,12 @@ if (project.properties["skip-publishing-init"] == "false") {
 
         token = getModrinthToken(project)
         projectId = modrinth_id
-        versionName = "[NEOFORGE][${minecraft_dependency}] ${mod_title} v${mod_base_version}"
+        versionName = "[FORGE][${minecraft_dependency}] ${mod_title} v${mod_base_version}"
         versionNumber = "${mod_version}"
         versionType = release_type.toUpperCase()
         uploadFile = shadowJar
         gameVersions = Arrays.asList(versions)
-        loaders = ['neoforge']
+        loaders = ['forge']
 
         syncBodyFrom = file('readme.md').text
         changelog = new File(project.getRootDir(), "changelog.md").readLines().join("\n")
@@ -210,14 +210,14 @@ if (project.properties["skip-publishing-init"] == "false") {
     tasks.register('modrinth') {
         group = 'upload'
         doLast {
-            throw new GradleException('Publishing init has been disabled in gradle.properties so Modrinth publishing is not available.')
+            throw new GradleException("Publishing init has been disabled in gradle.properties so Modrinth publishing is not available.")
         }
     }
 
     tasks.register('modrinthSyncBody') {
         group = 'upload'
         doLast {
-            throw new GradleException('Publishing init has been disabled in gradle.properties so Modrinth authoring is not available.')
+            throw new GradleException("Publishing init has been disabled in gradle.properties so Modrinth authoring is not available.")
         }
     }
 }
